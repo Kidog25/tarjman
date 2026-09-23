@@ -413,7 +413,7 @@
   <div class="field">
     <span class="flabel">Consumo di oggi</span>
     <p id="usage" class="fhelp" role="status"></p>
-    <p class="fhelp">Le "Frasi pronte" e le frasi già tradotte una volta non consumano nulla.</p>
+    <p class="fhelp">Le "Frasi pronte" non consumano nulla. Una frase scritta uguale a una già tradotta, con le stesse impostazioni, viene ripresa dalla memoria senza consumare, se la sua traduzione non dipende dalla conversazione.</p>
     <div><button id="forget" class="chip-btn quiet" type="button">Dimentica le frasi già tradotte</button></div>
   </div>
 
@@ -1238,11 +1238,11 @@
   }
 
   // ---------- Gemini ----------
-  function modelChain() {
+  function modelChain(tier) {
     var found = quota.models;
     var lite = found && found.lite.length ? found.lite.concat("gemini-flash-lite-latest") : LITE_MODELS;
     var flash = found && found.flash.length ? found.flash.concat("gemini-flash-latest") : FLASH_MODELS;
-    var order = (state.settings.tier === "deep" ? flash.concat(lite) : lite.concat(flash));
+    var order = ((tier || state.settings.tier) === "deep" ? flash.concat(lite) : lite.concat(flash));
     var custom = str(state.settings.model).replace(/^models\//, "");
     if (custom) order = [custom].concat(order);
     return order.filter(function (m, i) { return order.indexOf(m) === i; });
@@ -1265,9 +1265,9 @@
     return { lite: names(lite), flash: names(flash) };
   }
 
-  function genConfig(model, schema, plain) {
+  function genConfig(model, schema, plain, tier) {
     var gen = { responseMimeType: "application/json", responseSchema: schema };
-    var deep = state.settings.tier === "deep";
+    var deep = tier === "deep";
     if (/^gemini-[12]\./.test(model)) {
       gen.temperature = 0.2;
       gen.thinkingConfig = { thinkingBudget: deep ? -1 : 0 };
@@ -1337,11 +1337,11 @@
     return { code: "rejected", detail: msg };
   }
 
-  function callModel(model, parts, schema, key, plain) {
+  function callModel(model, parts, schema, key, plain, tier) {
     return request(API + "models/" + encodeURIComponent(model) + ":generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: genConfig(model, schema, plain) })
+      body: JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: genConfig(model, schema, plain, tier) })
     }).then(function (r) {
       var data = r.data;
       if (!r.res.ok) throw classify(r.res, data);
@@ -1366,16 +1366,17 @@
   // onWait(deadline) is called when every model is waiting for its minute (0 when the retry starts).
   // probe: the user asked to retry, so try one model even if all are marked out for the day
   // (billing may have been turned on).
-  function gemini(parts, schema, onWait, probe) {
+  function gemini(parts, schema, onWait, probe, tier) {
     var key = str(state.settings.key);
     if (!key) return Promise.reject({ code: "no_key" });
     rollDay();
-    var tried = {}, lastErr = null, waits = 0, serverErrors = 0;
+    tier = tier || state.settings.tier;
+    var tried = {}, lastErr = null, waits = 0, serverErrors = 0, probed = false;
 
     function giveUp(chain) {
-      if (lastErr && lastErr.code === "server") return lastErr;
       if (chain.every(function (m) { return quota.unavailable[m]; })) return { code: "no_models" };
       if (chain.every(function (m) { return quota.exhausted[m] || quota.unavailable[m]; })) return { code: "day_exhausted" };
+      if (serverErrors) return { code: "server" }; // the model still available is overloaded
       return lastErr || { code: "rate_limited", scope: "minute" };
     }
 
@@ -1385,7 +1386,7 @@
       if (current !== key) { key = current; tried = {}; lastErr = null; } // a new key was saved meanwhile
       var sent = key;
       var now = Date.now();
-      var chain = modelChain();
+      var chain = modelChain(tier);
       var model = chain.filter(function (m) { return !tried[m] && usable(m, now); })[0];
       if (!model) {
         var soonest = chain.filter(function (m) {
@@ -1400,18 +1401,21 @@
             return attempt();
           });
         }
-        // Every model is marked out for the day: check one again now and then, or when asked to.
-        model = chain.filter(function (m) {
-          return quota.exhausted[m] && !quota.unavailable[m] && !tried[m] && (probe || now - quota.exhausted[m] > 600000);
+        // Every model is marked out for the day: check one again when asked to, or 10 minutes after
+        // the newest mark (a failed check refreshes its mark, so it postpones the next one). One per call.
+        var newest = 0;
+        chain.forEach(function (m) { if (+quota.exhausted[m] > newest) newest = +quota.exhausted[m]; });
+        model = probed || !(probe || now - newest > 600000) ? null : chain.filter(function (m) {
+          return quota.exhausted[m] && !quota.unavailable[m] && !tried[m];
         })[0];
-        probe = false;
+        probed = true;
         if (!model || soonest) throw giveUp(chain);
       }
       tried[model] = true;
-      return callModel(model, parts, schema, sent, false).catch(function (e) {
+      return callModel(model, parts, schema, sent, false, tier).catch(function (e) {
         if (!e || e.code !== "thinking") throw e;
         noThinking[model] = true;
-        return callModel(model, parts, schema, sent, true);
+        return callModel(model, parts, schema, sent, true, tier);
       }).then(function (data) {
         if (str(state.settings.key) === sent) {
           // A model that was out for the day answered: the limits changed, trust them all again.
@@ -1580,11 +1584,11 @@
     return /[.!]$/.test(s) ? "." : "";
   }
   // The memory only reuses a translation for the very same text: accents, digits and "?" count.
-  function memoKey(dir, to, src) {
+  function memoKey(dir, to, src, me, tier) {
     var n = String(src || "").normalize("NFC").toLowerCase().replace(/\s+/g, " ")
       .replace(/^[\s"'«»“”]+|[\s"'«»“”.,;:]+$/g, "");
     if (!n) return "";
-    return [dir, state.settings.me, dir === "it2dar" ? (to || "m") : "-", state.settings.tier, n].join("|");
+    return [dir, me || state.settings.me, dir === "it2dar" ? (to || "m") : "-", tier || state.settings.tier, n].join("|");
   }
   function memoGet(k) {
     var hit = k && cache[k];
@@ -1605,9 +1609,11 @@
   }
 
   // ---------- phrasebook ----------
-  function pickVariant(v, to) {
+  // to: who is listening ("m"/"f"/"g"); me: the gender an "M"/"F" split follows (the user by default).
+  function pickVariant(v, to, me) {
+    me = me || state.settings.me;
     for (var d = 0; d < 3 && v && !Array.isArray(v); d++) {
-      v = ("M" in v) ? v[state.settings.me === "f" ? "F" : "M"] : (v[to] || v.m);
+      v = ("M" in v) ? v[me === "f" ? "F" : "M"] : (v[to] || v.m);
     }
     return Array.isArray(v) ? v : null;
   }
@@ -1624,6 +1630,24 @@
     var a = sentenceKind(typed), b = sentenceKind(entry);
     return !a || (a === "?" ? b === "?" : b !== "?");
   }
+  // What a user may type for a displayed phrase: "Salve! (la pace sia con voi)" also as "Salve!",
+  // "Alla salute! / Buon appetito!" also as either half.
+  function itForms(s) {
+    var out = [s];
+    String(s).replace(/\s*\([^)]*\)/g, "").split(" / ").forEach(function (x) {
+      if (x && out.indexOf(x) === -1) out.push(x);
+    });
+    return out;
+  }
+  // True when the last finished message is a question the user asked: a bare "labas" is then the answer.
+  function afterUserQuestion(m) {
+    var idx = state.messages.indexOf(m);
+    var prev = state.messages.slice(0, idx < 0 ? state.messages.length : idx).filter(function (x) {
+      return x.status === "done" && !x.example && x.out;
+    });
+    var last = prev[prev.length - 1];
+    return !!last && last.dir === "it2dar" && sentenceKind(last.src) === "?";
+  }
   function phraseAnswer(m) {
     var to = m.to || state.settings.to;
     var i, e, t;
@@ -1632,23 +1656,31 @@
       if (!k) return null;
       for (i = 0; i < PHRASES.length; i++) {
         e = PHRASES[i];
-        if (e.c === "diranno") continue;
+        // "Ti diranno" formulas are said to one person; the gendered ones are about the user.
+        if (e.c === "diranno" && (!Array.isArray(e.t) || to === "g")) continue;
         t = pickVariant(e.t, to);
-        if (t && normIt(t[0]) === k && sameKind(m.src, t[0])) return { ar: t[1], lat: t[2], note: e.n || "" };
+        if (t && itForms(t[0]).some(function (f) { return normIt(f) === k && sameKind(m.src, f); })) {
+          return { ar: t[1], lat: t[2], note: e.n || "" };
+        }
       }
       return null;
     }
     var d = normDar(m.src);
     if (!d) return null;
+    var answering = !sentenceKind(m.src) && afterUserQuestion(m);
     // Things relatives say come first: they carry the customary reply.
     var order = PHRASES.filter(function (x) { return x.c === "diranno"; })
       .concat(PHRASES.filter(function (x) { return x.c !== "diranno"; }));
     function hit(leaf) {
-      return leaf && (normDar(leaf[1]) === d || normDar(leaf[2]) === d) && sameKind(m.src, leaf[2]);
+      return leaf && (normDar(leaf[1]) === d || normDar(leaf[2]) === d) && sameKind(m.src, leaf[2]) &&
+        !(answering && sentenceKind(leaf[2]) === "?");
     }
     for (i = 0; i < order.length; i++) {
-      // Prefer the form that fits the current settings (e.g. "arrivata" for a woman).
-      var found = pickVariant(order[i].t, to);
+      // Prefer the form that fits who is talking. "Ti diranno" phrases are said to the user. Any other
+      // phrase is one the user normally says, here said by the relative: the relative is the speaker
+      // (M/F, from "Parli a") and the user is the one listening.
+      var found = order[i].c === "diranno" ? pickVariant(order[i].t, to)
+        : pickVariant(order[i].t, state.settings.me, to === "f" ? "f" : "m");
       if (!hit(found)) {
         found = null;
         eachLeaf(order[i].t, function (leaf) { if (!found && hit(leaf)) found = leaf; });
@@ -1742,6 +1774,7 @@
     m.local = null;
     m.waitUntil = 0;
     m.forced = !!force;
+    m.forceErr = null;
     if (m.kind === "text" && !force) {
       var local = localAnswer(m);
       if (local) {
@@ -1751,7 +1784,9 @@
         return;
       }
     }
-    var askKey = m.kind === "text" ? memoKey(m.dir, m.to, m.src) : "";
+    // The prompt is built for these settings: the memory must be filed under them too.
+    var me = state.settings.me, tier = state.settings.tier;
+    var askKey = m.kind === "text" ? memoKey(m.dir, m.to, m.src, me, tier) : "";
     var parts;
     if (m.kind === "audio") {
       var a = audioStore[m.id];
@@ -1765,7 +1800,7 @@
       m.waitUntil = until;
       render();
       if (until) startWaitTicker();
-    }, probe).then(function (r) {
+    }, probe, tier).then(function (r) {
       var out = normalize(r.data, m.dir);
       if (!out) throw { code: "bad_json" };
       if (out.empty) throw { code: "unheard", detail: out.note };
@@ -1773,14 +1808,19 @@
       delete out.standalone;
       m.model = r.model;
       clearBanner("key");
-      clearBanner("retry");
       var copy = JSON.parse(JSON.stringify(out));
       finish(m, out, null);
       // Only typed sentences whose translation does not depend on the conversation are kept.
-      if (m.kind === "text" && standalone) {
-        memoPut(askKey, copy);
-        var heardKey = memoKey(m.dir, m.to, m.src);
-        if (heardKey !== askKey) memoPut(heardKey, copy);
+      if (m.kind === "text") {
+        var heardKey = memoKey(m.dir, m.to, m.src, me, tier);
+        if (standalone) {
+          memoPut(askKey, copy);
+          if (heardKey !== askKey) memoPut(heardKey, copy);
+        } else if (cache[askKey] || cache[heardKey]) {
+          delete cache[askKey];
+          delete cache[heardKey];
+          saveCache();
+        }
       }
     }).catch(function (e) {
       if (!keep) { finish(m, null, e); return; }
@@ -1790,8 +1830,11 @@
       m.err = null;
       m.local = keep.local;
       m.out = keep.out;
-      var keyErr = e && (e.code === "bad_key" || e.code === "no_key");
-      showBanner(errCopy(e), "error", keyErr ? "Apri impostazioni" : null, keyErr ? function () { openSheet("key"); } : null, keyErr ? "key" : "retry");
+      if (e && (e.code === "bad_key" || e.code === "no_key")) {
+        showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); }, "key");
+      } else {
+        m.forceErr = errCopy(e);
+      }
       save();
       render();
     });
@@ -1978,7 +2021,8 @@
       actions.appendChild(cp2);
     }
     if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
-    if (m.local && m.kind === "text") actions.appendChild(btn("Traduci con Gemini", "chip-btn quiet", function () { retry(m, true); }));
+    if (m.forceErr) b.appendChild(el("div", "err", m.forceErr));
+    if (m.local && m.kind === "text") actions.appendChild(btn(m.forceErr ? "Riprova" : "Traduci con Gemini", "chip-btn quiet", function () { retry(m, true); }));
     if (!m.example) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
     b.appendChild(actions);
     return b;
@@ -2131,7 +2175,12 @@
     // Asking for the model list checks the key without using up a translation.
     listModels(k).then(function (list) {
       if (str(state.settings.key) !== k) return;
-      var wasOut = k === prevKey && Object.keys(quota.exhausted).length > 0;
+      rollDay();
+      var chain = modelChain();
+      // Same condition as the "finished for today" error: every model is out, at least one for the day.
+      var wasOut = k === prevKey &&
+        chain.some(function (m) { return quota.exhausted[m] && !quota.unavailable[m]; }) &&
+        chain.every(function (m) { return quota.exhausted[m] || quota.unavailable[m]; });
       var picked = pickModels(list);
       quota.models = picked.lite.length || picked.flash.length ? picked : null;
       quota.modelsAt = Date.now();
@@ -2145,7 +2194,6 @@
         ? "Chiave valida. Oggi avevi finito le traduzioni gratuite: se hai attivato la fatturazione puoi continuare, altrimenti ripartono alle " + resetClock() + "."
         : "Chiave valida. Puoi iniziare.";
       clearBanner("key");
-      clearBanner("retry");
       checkKeyBanner();
       updateUsage();
     }).catch(function (e) {
