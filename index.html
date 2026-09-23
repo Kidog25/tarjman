@@ -180,7 +180,7 @@
     font-size: .88rem; padding: 5px 12px; min-height: 34px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--surface); cursor: pointer;
   }
-  .pill[aria-checked="true"] { border-color: var(--mint); background: var(--mint-soft); color: var(--mint-ink); font-weight: 700; }
+  .pill[aria-checked="true"], .pill[aria-pressed="true"] { border-color: var(--mint); background: var(--mint-soft); color: var(--mint-ink); font-weight: 700; }
 
   .rec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .rec {
@@ -214,6 +214,7 @@
 
   .dock-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .85rem; color: var(--muted); }
   .link-btn { border: 0; background: none; padding: 4px 0; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: inherit; color: var(--ink); }
+  .foot-links { display: flex; gap: 16px; flex: none; }
 
   .text-row { display: flex; flex-direction: column; gap: 8px; }
   #msg {
@@ -259,6 +260,21 @@
   details[open] summary { margin-bottom: 8px; }
   .clear-zone { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
   .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .95rem; }
+
+  /* Phrasebook */
+  #phrases { gap: 14px; }
+  .ph-search {
+    width: 100%; font-size: 16px; padding: 10px 12px; min-height: 44px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--ground);
+  }
+  .ph-list { display: flex; flex-direction: column; gap: 6px; }
+  .ph-item {
+    display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
+    padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--ground); cursor: pointer;
+  }
+  .ph-main { font-weight: 700; overflow-wrap: anywhere; }
+  .ph-sub { font-style: italic; color: var(--muted); font-size: .92rem; overflow-wrap: anywhere; }
+  .ph-empty { color: var(--muted); margin: 0; }
 
   /* Big display */
   .big {
@@ -345,7 +361,10 @@
 
     <div class="dock-foot">
       <span id="dock-hint">Tocca per registrare, tocca di nuovo per tradurre.</span>
-      <button id="toggle-text" class="link-btn" type="button" aria-expanded="false">Scrivi</button>
+      <span class="foot-links">
+        <button id="open-phrases" class="link-btn" type="button">Frasi pronte</button>
+        <button id="toggle-text" class="link-btn" type="button" aria-expanded="false">Scrivi</button>
+      </span>
     </div>
   </div>
 </div>
@@ -387,7 +406,14 @@
       <button id="tier-quick" class="pill" type="button" role="radio">Veloce</button>
       <button id="tier-deep" class="pill" type="button" role="radio">Più accurata</button>
     </div>
-    <p class="fhelp">"Più accurata" fa ragionare il modello prima di rispondere: meglio con frasi lunghe o audio rumorosi, ma ci mette qualche secondo in più.</p>
+    <p class="fhelp">"Veloce" usa i modelli Flash-Lite: con la chiave gratuita fanno circa 500 traduzioni al giorno ciascuno. "Più accurata" parte dai modelli Flash, che ragionano di più ma ne fanno circa 20 al giorno; quando finiscono, l'app passa da sola ai Flash-Lite.</p>
+  </div>
+
+  <div class="field">
+    <span class="flabel">Consumo di oggi</span>
+    <p id="usage" class="fhelp" role="status"></p>
+    <p class="fhelp">Le "Frasi pronte" e le frasi già tradotte una volta non consumano nulla.</p>
+    <div><button id="forget" class="chip-btn quiet" type="button">Dimentica le frasi già tradotte</button></div>
   </div>
 
   <div class="field">
@@ -428,8 +454,8 @@
     <summary>Avanzate</summary>
     <div class="field">
       <label class="flabel" for="model">Modello Gemini</label>
-      <input id="model" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="gemini-2.5-flash">
-      <p class="fhelp">Lascia vuoto per usare gemini-2.5-flash. Se un giorno non esiste più, l'app passa da sola a gemini-flash-latest.</p>
+      <input id="model" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="automatico">
+      <p class="fhelp">Lascia vuoto e l'app sceglie da sola. Se scrivi un modello, lo prova per primo; se non esiste o ha finito le richieste, passa agli altri.</p>
     </div>
   </details>
 
@@ -441,6 +467,24 @@
       <button id="clear-no" class="chip-btn" type="button">Annulla</button>
     </div>
   </div>
+</section>
+
+<div id="phrases-backdrop" class="backdrop" hidden></div>
+<section id="phrases" class="sheet" role="dialog" aria-modal="true" aria-labelledby="phrases-title" hidden>
+  <div class="sheet-head">
+    <h2 id="phrases-title">Frasi pronte</h2>
+    <button id="close-phrases" class="chip-btn" type="button">Chiudi</button>
+  </div>
+  <p class="fhelp">Frasi già tradotte e scritte nell'app: funzionano anche senza internet e non consumano la chiave. Tocca una frase per aggiungerla alla conversazione.</p>
+  <div class="to-row" role="radiogroup" aria-label="A chi parli">
+    <span>Parli a</span>
+    <button id="ph-to-m" class="pill" type="button" role="radio">un uomo</button>
+    <button id="ph-to-f" class="pill" type="button" role="radio">una donna</button>
+    <button id="ph-to-g" class="pill" type="button" role="radio">più persone</button>
+  </div>
+  <input id="ph-search" class="ph-search" type="search" autocomplete="off" aria-label="Cerca una frase" placeholder="Cerca una frase…">
+  <div id="ph-cats" class="pills" role="group" aria-label="Argomenti"></div>
+  <div id="ph-list" class="ph-list"></div>
 </section>
 
 <div id="big" class="big" role="dialog" aria-modal="true" aria-label="Frase da mostrare" hidden>
@@ -460,9 +504,16 @@
   "use strict";
 
   var STORE_KEY = "tarjman.app.v1";
-  var API = "https://generativelanguage.googleapis.com/v1beta/models/";
-  var DEFAULT_MODEL = "gemini-2.5-flash";
-  var FALLBACK_MODEL = "gemini-flash-latest";
+  var QUOTA_KEY = "tarjman.quota.v1";
+  var CACHE_KEY = "tarjman.cache.v1";
+  var API = "https://generativelanguage.googleapis.com/v1beta/";
+  // The free tier counts requests per model: when one model hits its limit, the next one still answers.
+  // Flash-Lite models allow about 500 requests a day each, full Flash models about 20.
+  // "Salva e prova" replaces these lists with the models the key can really use.
+  var LITE_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"];
+  var FLASH_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+  var REQUEST_TIMEOUT = 60000;
+  var CACHE_MAX = 300;
   var MAX_SECONDS = 60;
   var ARABIC_RE = /[؀-ۿݐ-ݿ]/;
   var TO_LABEL = { m: "a un uomo", f: "a una donna", g: "a più persone" };
@@ -532,11 +583,25 @@
     }
   ];
 
+  // Offline phrasebook. A leaf is [italiano, darija in arabo, darija in lettere latine].
+  // An object splits a phrase: "M"/"F" by the user's gender, "m"/"f"/"g" by who the other side is
+  // (one man, one woman, several people). "r" is the customary reply, "n" a short note.
+  var PHRASE_CATS = [
+    ["saluti", "Saluti"], ["famiglia", "Come stai"], ["tavola", "A tavola"], ["cortesia", "Cortesia"],
+    ["capirsi", "Capirsi"], ["occasioni", "Auguri"], ["io", "Su di me"], ["pratico", "Pratico"], ["diranno", "Ti diranno"]
+  ];
+  var PHRASES = /*PHRASES*/[]/*END*/;
+
   var state = {
     settings: { key: "", model: "", me: "m", to: "m", tier: "quick", speak: false },
     messages: []
   };
   var audioStore = {}; // id -> { wav: ArrayBuffer, url: string } (this session only)
+  // Per-model usage for the current Pacific day (when Google resets free quotas).
+  var quota = { day: "", used: {}, exhausted: {}, unavailable: {}, models: null, modelsAt: 0 };
+  var cooldown = {};   // model -> time its per-minute limit clears (this session only)
+  var noThinking = {}; // model -> true once it has refused our thinking setting
+  var cache = {};      // normalized request -> { o: translation, t: time }
 
   // ---------- storage ----------
   function load() {
@@ -567,6 +632,27 @@
         messages: state.messages.filter(function (m) { return !m.example; }).slice(-100)
       }));
     } catch (e) { /* ignore */ }
+  }
+  function loadExtras() {
+    try {
+      var q = JSON.parse(localStorage.getItem(QUOTA_KEY) || "null");
+      if (q && typeof q === "object") {
+        if (typeof q.day === "string") quota.day = q.day;
+        ["used", "exhausted", "unavailable"].forEach(function (k) { if (q[k] && typeof q[k] === "object") quota[k] = q[k]; });
+        if (q.models && Array.isArray(q.models.lite) && Array.isArray(q.models.flash)) quota.models = q.models;
+        if (typeof q.modelsAt === "number") quota.modelsAt = q.modelsAt;
+      }
+    } catch (e) { /* start fresh */ }
+    try {
+      var c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      if (c && typeof c === "object") cache = c;
+    } catch (e) { /* start fresh */ }
+  }
+  function saveQuota() {
+    try { localStorage.setItem(QUOTA_KEY, JSON.stringify(quota)); } catch (e) { /* ignore */ }
+  }
+  function saveCache() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { /* ignore */ }
   }
 
   // ---------- helpers ----------
@@ -808,7 +894,7 @@
       $("dock-hint").textContent = "Troppo breve: tocca, parla, poi tocca di nuovo.";
       return;
     }
-    var pcm = normalizePeak(downsample(samples, rate, 16000));
+    var pcm = normalizePeak(trimSilence(downsample(samples, rate, 16000), 16000));
     var wav = encodeWav(pcm, 16000);
     var m = {
       id: uid(), dir: r.dir, kind: "audio", src: "", secs: Math.round(dur),
@@ -839,6 +925,26 @@
       out[i] = b > a ? sum / (b - a) : 0;
     }
     return out;
+  }
+  // Cuts the silence before and after the speech (Gemini counts audio tokens by the second).
+  function trimSilence(buf, rate) {
+    var frame = Math.round(rate * 0.02), n = Math.floor(buf.length / frame);
+    if (n < 10) return buf;
+    var rms = new Float32Array(n), loudest = 0;
+    for (var f = 0; f < n; f++) {
+      var sum = 0;
+      for (var i = f * frame; i < (f + 1) * frame; i++) sum += buf[i] * buf[i];
+      rms[f] = Math.sqrt(sum / frame);
+      if (rms[f] > loudest) loudest = rms[f];
+    }
+    var gate = Math.max(0.004, loudest * 0.06);
+    var first = 0, last = n - 1;
+    while (first < n && rms[first] < gate) first++;
+    while (last > first && rms[last] < gate) last--;
+    var pad = Math.round(0.4 * rate);
+    var start = Math.max(0, first * frame - pad), end = Math.min(buf.length, (last + 1) * frame + pad);
+    if (first >= n || end - start < rate * 0.5) return buf;
+    return buf.subarray(start, end);
   }
   function normalizePeak(buf) {
     var peak = 0;
@@ -890,52 +996,255 @@
   $("rec-it").addEventListener("click", function () { onRecButton("it2dar"); });
   $("rec-cancel").addEventListener("click", cancelRec);
 
-  // ---------- Gemini ----------
-  function currentModel() { return str(state.settings.model) || DEFAULT_MODEL; }
-
-  function callModel(model, parts, schema, key) {
-    var gen = { responseMimeType: "application/json", responseSchema: schema, temperature: 0.2 };
-    if (/^gemini-2\.5-flash/.test(model)) {
-      gen.thinkingConfig = { thinkingBudget: state.settings.tier === "deep" ? -1 : 0 };
+  // ---------- free-tier day (Google resets quotas at midnight Pacific time) ----------
+  function pacificParts(t) {
+    var o = {};
+    try {
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles", hourCycle: "h23",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"
+      }).formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    } catch (e) { o = {}; }
+    if (!o.year) { // no time zone support: assume UTC-8
+      var d = new Date(t - 8 * 3600000);
+      o = { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes(), second: d.getUTCSeconds() };
     }
-    var body = JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: gen });
-    return fetch(API + encodeURIComponent(model) + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: body
-    }).catch(function () {
-      throw { code: "network" };
+    return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, s: +o.second };
+  }
+  function pacificDay(t) {
+    var p = pacificParts(t);
+    return p.y + "-" + p.mo + "-" + p.d;
+  }
+  function pacificOffset(t) {
+    var p = pacificParts(t);
+    return Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(t / 1000) * 1000;
+  }
+  function nextReset(t) {
+    var p = pacificParts(t);
+    var wall = Date.UTC(p.y, p.mo - 1, p.d + 1, 0, 0, 0);
+    var guess = wall - pacificOffset(t);
+    return wall - pacificOffset(guess); // corrects the hour when daylight saving changes overnight
+  }
+  function resetClock() {
+    return new Date(nextReset(Date.now())).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+  function rollDay() {
+    var today = pacificDay(Date.now());
+    if (quota.day === today) return;
+    quota.day = today;
+    quota.used = {};
+    quota.exhausted = {};
+    var week = Date.now() - 7 * 86400000;
+    Object.keys(quota.unavailable).forEach(function (k) { if (!(quota.unavailable[k] > week)) delete quota.unavailable[k]; });
+    saveQuota();
+  }
+
+  // ---------- Gemini ----------
+  function modelChain() {
+    var found = quota.models;
+    var lite = found && found.lite.length ? found.lite.concat("gemini-flash-lite-latest") : LITE_MODELS;
+    var flash = found && found.flash.length ? found.flash.concat("gemini-flash-latest") : FLASH_MODELS;
+    var order = (state.settings.tier === "deep" ? flash.concat(lite) : lite.concat(flash));
+    var custom = str(state.settings.model).replace(/^models\//, "");
+    if (custom) order = [custom].concat(order);
+    return order.filter(function (m, i) { return order.indexOf(m) === i; });
+  }
+
+  // Keeps the stable "gemini-X.Y-flash" and "gemini-X.Y-flash-lite" models from models.list, newest first.
+  function pickModels(list) {
+    var lite = [], flash = [];
+    (list || []).forEach(function (m) {
+      var name = String((m && m.name) || "").replace(/^models\//, "");
+      var methods = (m && m.supportedGenerationMethods) || [];
+      var x = /^gemini-(\d+)\.(\d+)-flash(-lite)?$/.exec(name);
+      if (!x || methods.indexOf("generateContent") === -1) return;
+      var major = +x[1], minor = +x[2];
+      if (major < 2 || (major === 2 && minor < 5)) return;
+      (x[3] ? lite : flash).push({ name: name, major: major, minor: minor });
+    });
+    function byNewest(a, b) { return b.major - a.major || b.minor - a.minor; }
+    function names(arr) { return arr.sort(byNewest).map(function (x) { return x.name; }); }
+    return { lite: names(lite), flash: names(flash) };
+  }
+
+  function genConfig(model, schema, plain) {
+    var gen = { responseMimeType: "application/json", responseSchema: schema };
+    var deep = state.settings.tier === "deep";
+    if (/^gemini-[12]\./.test(model)) {
+      gen.temperature = 0.2;
+      gen.thinkingConfig = { thinkingBudget: deep ? -1 : 0 };
+    } else if (/^gemini-/.test(model)) {
+      // Gemini 3 keeps its default temperature; full Flash models from 3.7 on refuse "minimal".
+      gen.thinkingConfig = { thinkingLevel: deep ? "medium" : (/lite/.test(model) ? "minimal" : "low") };
+    }
+    if (plain || noThinking[model]) delete gen.thinkingConfig;
+    return gen;
+  }
+
+  function request(url, opts) {
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, REQUEST_TIMEOUT) : null;
+    if (ctl) opts.signal = ctl.signal;
+    return fetch(url, opts).catch(function (err) {
+      throw { code: err && err.name === "AbortError" ? "timeout" : "network" };
     }).then(function (res) {
       return res.json().catch(function () { return null; }).then(function (data) {
-        if (!res.ok) {
-          var msg = (data && data.error && data.error.message) || "";
-          if (res.status === 404 || /is not found|not supported for generateContent/i.test(msg)) throw { code: "model_not_found", detail: msg };
-          if (/API key not valid|API_KEY_INVALID|API key expired/i.test(msg) || (data && JSON.stringify(data).indexOf("API_KEY_INVALID") !== -1)) throw { code: "bad_key" };
-          if (res.status === 429) throw { code: "rate_limited" };
-          if (res.status >= 500) throw { code: "server" };
-          throw { code: "rejected", detail: msg };
-        }
-        var cand = data && data.candidates && data.candidates[0];
-        if (!cand) throw { code: data && data.promptFeedback && data.promptFeedback.blockReason ? "blocked" : "empty" };
-        var text = ((cand.content && cand.content.parts) || []).map(function (p) { return p.text || ""; }).join("");
-        if (!text) throw { code: cand.finishReason === "SAFETY" ? "blocked" : "empty" };
-        try { return JSON.parse(text); } catch (e) {
-          var mm = text.match(/\{[\s\S]*\}/);
-          if (mm) { try { return JSON.parse(mm[0]); } catch (e2) { /* fall through */ } }
-          throw { code: "bad_json" };
-        }
+        return { res: res, data: data };
       });
+    }).then(function (r) {
+      if (timer) clearTimeout(timer);
+      return r;
+    }, function (e) {
+      if (timer) clearTimeout(timer);
+      throw e;
     });
   }
 
-  function gemini(parts, schema) {
+  function quotaInfo(err) {
+    var scope = "", retry = 0;
+    (err.details || []).forEach(function (d) {
+      var type = String((d && d["@type"]) || "");
+      if (/QuotaFailure$/.test(type)) {
+        (d.violations || []).forEach(function (v) {
+          var id = String((v && (v.quotaId || v.quotaMetric)) || "");
+          if (/PerDay/i.test(id)) scope = "day";
+          else if (/PerMinute/i.test(id) && scope !== "day") scope = "minute";
+        });
+      } else if (/RetryInfo$/.test(type)) {
+        retry = parseFloat(d.retryDelay) || 0;
+      }
+    });
+    var msg = String(err.message || "");
+    if (!scope && /per ?day/i.test(msg)) scope = "day";
+    if (!retry) { var r = /retry in ([\d.]+)\s*s/i.exec(msg); if (r) retry = parseFloat(r[1]); }
+    return { scope: scope || "minute", retry: retry };
+  }
+
+  function classify(res, data) {
+    var err = (data && data.error) || {};
+    var msg = String(err.message || "");
+    var raw = data ? JSON.stringify(data) : "";
+    if (/API key not valid|API_KEY_INVALID|API key expired/i.test(msg) || raw.indexOf("API_KEY_INVALID") !== -1) return { code: "bad_key" };
+    if (res.status === 429 || err.status === "RESOURCE_EXHAUSTED") {
+      if (/prepay|credits? (are |is )?depleted/i.test(msg)) return { code: "billing", detail: msg };
+      var q = quotaInfo(err);
+      return { code: "rate_limited", scope: q.scope, retry: q.retry };
+    }
+    if (res.status === 404 || /is not found|not supported for generateContent|no longer available/i.test(msg)) return { code: "model_not_found", detail: msg };
+    if (res.status === 400 && /thinking/i.test(msg)) return { code: "thinking", detail: msg };
+    if (res.status === 403) return { code: "forbidden", detail: msg };
+    if (res.status >= 500) return { code: "server" };
+    return { code: "rejected", detail: msg };
+  }
+
+  function callModel(model, parts, schema, key, plain) {
+    return request(API + "models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: genConfig(model, schema, plain) })
+    }).then(function (r) {
+      var data = r.data;
+      if (!r.res.ok) throw classify(r.res, data);
+      var cand = data && data.candidates && data.candidates[0];
+      if (!cand) throw { code: data && data.promptFeedback && data.promptFeedback.blockReason ? "blocked" : "empty" };
+      var text = ((cand.content && cand.content.parts) || []).map(function (p) { return p.thought ? "" : (p.text || ""); }).join("");
+      if (!text) throw { code: cand.finishReason === "SAFETY" ? "blocked" : "empty" };
+      try { return JSON.parse(text); } catch (e) {
+        var mm = text.match(/\{[\s\S]*\}/);
+        if (mm) { try { return JSON.parse(mm[0]); } catch (e2) { /* fall through */ } }
+        throw { code: "bad_json" };
+      }
+    });
+  }
+
+  function usable(model, now) {
+    return !quota.exhausted[model] && !quota.unavailable[model] && !(cooldown[model] > now);
+  }
+
+  // Tries the models in order. A model that is out of quota for the day, or gone, is skipped until
+  // the next reset; one that hit its per-minute limit is skipped until that minute is over.
+  function gemini(parts, schema, onWait) {
     var key = str(state.settings.key);
     if (!key) return Promise.reject({ code: "no_key" });
-    var model = currentModel();
-    return callModel(model, parts, schema, key).catch(function (e) {
-      if (e && e.code === "model_not_found" && model !== FALLBACK_MODEL) return callModel(FALLBACK_MODEL, parts, schema, key);
-      throw e;
+    rollDay();
+    var tried = {}, lastErr = null, waits = 0;
+
+    function giveUp(chain) {
+      if (chain.every(function (m) { return quota.unavailable[m]; })) return { code: "no_models" };
+      if (chain.every(function (m) { return quota.exhausted[m] || quota.unavailable[m]; })) return { code: "day_exhausted" };
+      return lastErr || { code: "rate_limited", scope: "minute" };
+    }
+
+    function attempt() {
+      var now = Date.now();
+      var chain = modelChain();
+      var model = chain.filter(function (m) { return !tried[m] && usable(m, now); })[0];
+      if (!model) {
+        var soonest = chain.filter(function (m) {
+          return !quota.exhausted[m] && !quota.unavailable[m] && cooldown[m] > now;
+        }).map(function (m) { return cooldown[m]; }).sort(function (a, b) { return a - b; })[0];
+        if (soonest && waits < 2 && soonest - now <= 70000) {
+          waits++;
+          tried = {};
+          if (onWait) onWait(Math.ceil((soonest - now) / 1000));
+          return new Promise(function (ok) { setTimeout(ok, soonest - now + 300); }).then(attempt);
+        }
+        throw giveUp(chain);
+      }
+      tried[model] = true;
+      return callModel(model, parts, schema, key, false).catch(function (e) {
+        if (!e || e.code !== "thinking") throw e;
+        noThinking[model] = true;
+        return callModel(model, parts, schema, key, true);
+      }).then(function (data) {
+        quota.used[model] = (quota.used[model] || 0) + 1;
+        saveQuota();
+        return { data: data, model: model };
+      }, function (e) {
+        lastErr = e;
+        var code = e && e.code;
+        if (code === "rate_limited") {
+          if (e.scope === "day") { quota.exhausted[model] = true; saveQuota(); }
+          else cooldown[model] = Date.now() + Math.min(65, Math.max(10, e.retry || 60)) * 1000;
+          return attempt();
+        }
+        if (code === "model_not_found") {
+          quota.unavailable[model] = Date.now();
+          saveQuota();
+          if (Date.now() - quota.modelsAt > 86400000) refreshModels();
+          return attempt();
+        }
+        if (code === "server") {
+          cooldown[model] = Date.now() + 30000;
+          return attempt();
+        }
+        throw e;
+      });
+    }
+    return Promise.resolve().then(attempt);
+  }
+
+  // Lists the models this key can use. It checks the key without spending any translation.
+  function listModels(key) {
+    return request(API + "models?pageSize=1000", {
+      method: "GET",
+      headers: { "x-goog-api-key": key }
+    }).then(function (r) {
+      if (!r.res.ok) throw classify(r.res, r.data);
+      return (r.data && r.data.models) || [];
     });
+  }
+  var refreshing = false;
+  function refreshModels() {
+    var key = str(state.settings.key);
+    if (!key || refreshing) return;
+    refreshing = true;
+    listModels(key).then(function (list) {
+      var picked = pickModels(list);
+      if (picked.lite.length || picked.flash.length) quota.models = picked;
+      quota.modelsAt = Date.now();
+      saveQuota();
+    }).catch(function () { /* keep what we have */ }).then(function () { refreshing = false; });
   }
 
   function errCopy(e) {
@@ -943,11 +1252,16 @@
     switch (code) {
       case "no_key": return "Manca la chiave Gemini: inseriscila nelle impostazioni.";
       case "bad_key": return "La chiave Gemini non è valida. Controllala nelle impostazioni.";
-      case "rate_limited": return "Hai raggiunto il limite di Gemini (il piano gratuito ha un tetto al minuto e al giorno). Aspetta un minuto e riprova.";
+      case "rate_limited": return "Troppe traduzioni in un minuto per il piano gratuito di Gemini. Aspetta un minuto e riprova.";
+      case "day_exhausted": return "Per oggi hai finito le traduzioni gratuite di Gemini su tutti i modelli. Ripartono alle " + resetClock() + ". Intanto le \"Frasi pronte\" funzionano senza chiave.";
+      case "billing": return "Il credito prepagato di Gemini è finito: ricaricalo su aistudio.google.com.";
+      case "no_models": return "Nessun modello Gemini risponde con questa chiave. Apri le impostazioni e premi \"Salva e prova\".";
+      case "forbidden": return "Google non permette a questa chiave di usare Gemini" + (e.detail ? ": " + e.detail.slice(0, 180) : ".");
       case "network": return "Niente connessione a internet. Riprova quando sei online.";
+      case "timeout": return "Gemini ci mette troppo a rispondere. Riprova.";
       case "server": return "Gemini non risponde in questo momento. Riprova tra poco.";
       case "blocked": return "Gemini non ha tradotto questo contenuto.";
-      case "model_not_found": return "Il modello scritto nelle impostazioni non esiste. Svuota il campo \"Modello Gemini\".";
+      case "model_not_found": return "Questo modello Gemini non esiste più. Apri le impostazioni e premi \"Salva e prova\".";
       case "no_audio": return "L'audio non è più disponibile: registra di nuovo.";
       case "unheard": return e.detail || "Non ho capito l'audio. Riprova più vicino al telefono, una persona alla volta.";
       case "rejected": return "Gemini ha rifiutato la richiesta" + (e.detail ? ": " + e.detail.slice(0, 180) : ".");
@@ -1021,8 +1335,167 @@
     return { heard: heard, it: it, lat: str(res.lat), note: note, reply: reply };
   }
 
+  // ---------- translation memory ----------
+  function normIt(s) {
+    return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function normDar(s) {
+    return String(s || "").toLowerCase().normalize("NFD")
+      .replace(/[̀-ًͯ-ٰٟـ]/g, "")
+      .replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
+      .replace(/ou/g, "u").replace(/ch/g, "sh")
+      .replace(/[^a-z0-9ء-ي]+/g, " ")
+      .replace(/(.)\1+/g, "$1").trim();
+  }
+  function memoKey(dir, to, src) {
+    var n = dir === "it2dar" ? normIt(src) : normDar(src);
+    if (!n) return "";
+    return [dir, state.settings.me, dir === "it2dar" ? (to || "m") : "-", n].join("|");
+  }
+  function memoGet(k) {
+    var hit = k && cache[k];
+    if (!hit || !hit.o) return null;
+    hit.t = Date.now();
+    saveCache();
+    return JSON.parse(JSON.stringify(hit.o));
+  }
+  function memoPut(k, out) {
+    if (!k || !out) return;
+    cache[k] = { o: out, t: Date.now() };
+    var keys = Object.keys(cache);
+    if (keys.length > CACHE_MAX) {
+      keys.sort(function (a, b) { return (cache[a].t || 0) - (cache[b].t || 0); })
+        .slice(0, keys.length - CACHE_MAX).forEach(function (x) { delete cache[x]; });
+    }
+    saveCache();
+  }
+
+  // ---------- phrasebook ----------
+  function pickVariant(v, to) {
+    for (var d = 0; d < 3 && v && !Array.isArray(v); d++) {
+      v = ("M" in v) ? v[state.settings.me === "f" ? "F" : "M"] : (v[to] || v.m);
+    }
+    return Array.isArray(v) ? v : null;
+  }
+  function eachLeaf(v, fn) {
+    if (Array.isArray(v)) fn(v);
+    else if (v && typeof v === "object") Object.keys(v).forEach(function (k) { eachLeaf(v[k], fn); });
+  }
+  function heardOut(e, leaf, to) {
+    var r = e.r ? pickVariant(e.r, to) : null;
+    return { heard: leaf[1], it: leaf[0], lat: leaf[2], note: e.n || "", reply: r ? { ar: r[1], lat: r[2], it: r[0] } : null };
+  }
+  function phraseAnswer(m) {
+    var to = m.to || state.settings.to;
+    var i, e, t;
+    if (m.dir === "it2dar") {
+      var k = normIt(m.src);
+      if (!k) return null;
+      for (i = 0; i < PHRASES.length; i++) {
+        e = PHRASES[i];
+        if (e.c === "diranno") continue;
+        t = pickVariant(e.t, to);
+        if (t && normIt(t[0]) === k) return { ar: t[1], lat: t[2], note: e.n || "" };
+      }
+      return null;
+    }
+    var d = normDar(m.src);
+    if (!d) return null;
+    // Things relatives say come first: they carry the customary reply.
+    var order = PHRASES.filter(function (x) { return x.c === "diranno"; })
+      .concat(PHRASES.filter(function (x) { return x.c !== "diranno"; }));
+    for (i = 0; i < order.length; i++) {
+      var found = null;
+      eachLeaf(order[i].t, function (leaf) {
+        if (!found && (normDar(leaf[1]) === d || normDar(leaf[2]) === d)) found = leaf;
+      });
+      if (found) return heardOut(order[i], found, to);
+    }
+    return null;
+  }
+
+  var phCat = "saluti";
+  function openPhrases() {
+    updateTo();
+    $("ph-search").value = "";
+    renderPhrases();
+    $("phrases").hidden = false;
+    $("phrases-backdrop").hidden = false;
+    $("phrases").scrollTop = 0;
+    $("close-phrases").focus();
+  }
+  function closePhrases() {
+    $("phrases").hidden = true;
+    $("phrases-backdrop").hidden = true;
+  }
+  function renderPhrases() {
+    var raw = $("ph-search").value.trim();
+    var q = normIt(raw), qd = normDar(raw);
+    var to = state.settings.to;
+    var cats = $("ph-cats");
+    cats.textContent = "";
+    PHRASE_CATS.forEach(function (c) {
+      var b = btn(c[1], "pill", function () { phCat = c[0]; $("ph-search").value = ""; renderPhrases(); });
+      b.setAttribute("aria-pressed", String(!raw && phCat === c[0]));
+      cats.appendChild(b);
+    });
+    var list = $("ph-list");
+    list.textContent = "";
+    var shown = 0;
+    PHRASES.forEach(function (e) {
+      var t = pickVariant(e.t, to);
+      if (!t) return;
+      if (raw) {
+        var hit = (q && normIt(t[0]).indexOf(q) !== -1) ||
+          (qd && (normDar(t[1]).indexOf(qd) !== -1 || normDar(t[2]).indexOf(qd) !== -1));
+        if (!hit) return;
+      } else if (e.c !== phCat) {
+        return;
+      }
+      var heard = e.c === "diranno";
+      var item = el("button", "ph-item");
+      item.type = "button";
+      item.appendChild(el("span", "ph-main", heard ? t[2] : t[0]));
+      item.appendChild(el("span", "ph-sub", heard ? t[0] : t[2]));
+      item.addEventListener("click", function () { usePhrase(e); });
+      list.appendChild(item);
+      shown++;
+    });
+    if (!shown) list.appendChild(el("p", "ph-empty", "Nessuna frase trovata. Scrivila con \"Scrivi\": la traduce Gemini."));
+  }
+  function usePhrase(e) {
+    unlockSpeech();
+    var to = state.settings.to;
+    var t = pickVariant(e.t, to);
+    if (!t) return;
+    var heard = e.c === "diranno";
+    var m = {
+      id: uid(), dir: heard ? "dar2it" : "it2dar", kind: "text", src: heard ? t[1] : t[0],
+      to: heard ? null : to, status: "pending", ts: Date.now()
+    };
+    closePhrases();
+    addMessage(m, heard ? heardOut(e, t, to) : { ar: t[1], lat: t[2], note: e.n || "" });
+  }
+
+  // A typed sentence that is already in the phrasebook or was translated before costs nothing.
+  function localAnswer(m) {
+    var ph = phraseAnswer(m);
+    if (ph) return { source: "phrase", out: ph };
+    var memo = memoGet(memoKey(m.dir, m.to, m.src));
+    if (memo) return { source: "memo", out: memo };
+    return null;
+  }
+
   // ---------- translate ----------
-  function translate(m) {
+  function translate(m, force) {
+    m.local = null;
+    m.wait = 0;
+    if (m.kind === "text" && !force) {
+      var local = localAnswer(m);
+      if (local) { m.local = local.source; finish(m, local.out, null); return; }
+    }
+    var askKey = m.kind === "text" ? memoKey(m.dir, m.to, m.src) : "";
     var parts;
     if (m.kind === "audio") {
       var a = audioStore[m.id];
@@ -1031,17 +1504,27 @@
     } else {
       parts = [{ text: buildPrompt(m) }];
     }
-    gemini(parts, m.dir === "it2dar" ? SCHEMA_IT2DAR : SCHEMA_DAR2IT).then(function (res) {
-      var out = normalize(res, m.dir);
+    gemini(parts, m.dir === "it2dar" ? SCHEMA_IT2DAR : SCHEMA_DAR2IT, function (secs) {
+      if (m.status !== "pending") return;
+      m.wait = secs;
+      render();
+    }).then(function (r) {
+      var out = normalize(r.data, m.dir);
       if (!out) throw { code: "bad_json" };
       if (out.empty) throw { code: "unheard", detail: out.note };
+      m.model = r.model;
+      var copy = JSON.parse(JSON.stringify(out));
       finish(m, out, null);
+      memoPut(askKey, copy);
+      var heardKey = memoKey(m.dir, m.to, m.src);
+      if (heardKey !== askKey) memoPut(heardKey, copy);
     }).catch(function (e) {
       finish(m, null, e);
     });
   }
 
   function finish(m, out, e) {
+    m.wait = 0;
     if (out) {
       if (out.heard) m.src = out.heard;
       delete out.heard;
@@ -1054,6 +1537,8 @@
       m.err = errCopy(e);
       if (e && (e.code === "bad_key" || e.code === "no_key")) {
         showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); });
+      } else if (e && e.code === "day_exhausted") {
+        showBanner(errCopy(e), "error", "Frasi pronte", openPhrases);
       }
     }
     save();
@@ -1061,16 +1546,21 @@
     scrollToEnd();
   }
 
-  function addMessage(m) {
+  function addMessage(m, phrase) {
     if (state.messages.some(function (x) { return x.example; })) {
       state.messages = state.messages.filter(function (x) { return !x.example; });
     }
     state.messages.push(m);
     $("dock-hint").textContent = "Tocca per registrare, tocca di nuovo per tradurre.";
+    keepAwake();
+    if (phrase) {
+      m.local = "phrase";
+      finish(m, phrase, null);
+      return;
+    }
     save();
     render();
     scrollToEnd();
-    keepAwake();
     translate(m);
   }
 
@@ -1078,21 +1568,23 @@
     unlockSpeech();
     var text = $("msg").value.trim();
     if (!text) { $("msg").focus(); return; }
-    if (!state.settings.key) { openSheet("key"); return; }
     if (dir === "it2dar" && ARABIC_RE.test(text)) dir = "dar2it";
-    $("msg").value = "";
-    autosize();
-    addMessage({
+    var m = {
       id: uid(), dir: dir, kind: "text", src: text,
       to: dir === "it2dar" ? state.settings.to : null, status: "pending", ts: Date.now()
-    });
+    };
+    if (!state.settings.key && !localAnswer(m)) { openSheet("key"); return; }
+    $("msg").value = "";
+    autosize();
+    addMessage(m);
   }
 
-  function retry(m) {
+  function retry(m, force) {
+    if (force && !state.settings.key) { openSheet("key"); return; }
     m.status = "pending";
     m.err = null;
     render();
-    translate(m);
+    translate(m, force);
   }
 
   function correct(m) {
@@ -1114,6 +1606,7 @@
     who.appendChild(el("span", null, mine ? "Tu · italiano" : "Famiglia · darija"));
     if (mine && m.to && TO_LABEL[m.to]) who.appendChild(el("span", "to-tag", TO_LABEL[m.to]));
     if (m.example) who.appendChild(el("span", "ex-tag", "Esempio"));
+    if (m.status === "done" && m.local) who.appendChild(el("span", "ex-tag", m.local === "phrase" ? "Frase pronta" : "Già tradotta"));
     b.appendChild(who);
 
     var a = audioStore[m.id];
@@ -1124,7 +1617,9 @@
     }
 
     if (m.status === "pending") {
-      b.appendChild(el("div", "pending", m.kind === "audio" ? "Ascolto e traduco…" : "Traduco…"));
+      b.appendChild(el("div", "pending", m.wait
+        ? "Troppe richieste in un minuto: riprovo da solo tra " + m.wait + " s…"
+        : (m.kind === "audio" ? "Ascolto e traduco…" : "Traduco…")));
       return b;
     }
 
@@ -1187,6 +1682,7 @@
       actions.appendChild(cp2);
     }
     if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
+    if (m.local && m.kind === "text") actions.appendChild(btn("Traduci con Gemini", "chip-btn quiet", function () { retry(m, true); }));
     if (!m.example) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
     b.appendChild(actions);
     return b;
@@ -1214,10 +1710,14 @@
 
   // ---------- dock ----------
   function updateTo() {
-    ["m", "f", "g"].forEach(function (k) { $("to-" + k).setAttribute("aria-checked", String(state.settings.to === k)); });
+    ["m", "f", "g"].forEach(function (k) {
+      $("to-" + k).setAttribute("aria-checked", String(state.settings.to === k));
+      $("ph-to-" + k).setAttribute("aria-checked", String(state.settings.to === k));
+    });
   }
   ["m", "f", "g"].forEach(function (k) {
     $("to-" + k).addEventListener("click", function () { state.settings.to = k; updateTo(); save(); });
+    $("ph-to-" + k).addEventListener("click", function () { state.settings.to = k; updateTo(); save(); renderPhrases(); });
   });
 
   function setTextOpen(open) {
@@ -1236,6 +1736,10 @@
     t.style.height = Math.min(t.scrollHeight + 2, 140) + "px";
   }
   $("msg").addEventListener("input", autosize);
+  $("open-phrases").addEventListener("click", openPhrases);
+  $("close-phrases").addEventListener("click", closePhrases);
+  $("phrases-backdrop").addEventListener("click", closePhrases);
+  $("ph-search").addEventListener("input", renderPhrases);
   $("send-it").addEventListener("click", function () { sendText("it2dar"); });
   $("send-dar").addEventListener("click", function () { sendText("dar2it"); });
 
@@ -1252,8 +1756,26 @@
       ? "Usa la voce araba del telefono: l'accento non è marocchino, ma di solito si capisce."
       : "Su questo dispositivo non c'è una voce araba: il pulsante Ascolta resta nascosto.";
   }
+  function updateUsage() {
+    rollDay();
+    var total = 0, parts = [];
+    Object.keys(quota.used).forEach(function (k) {
+      total += quota.used[k];
+      parts.push(k.replace(/^gemini-/, "") + ": " + quota.used[k]);
+    });
+    var txt = total
+      ? "Oggi " + total + (total === 1 ? " traduzione" : " traduzioni") + " con Gemini (" + parts.join(", ") + ")."
+      : "Oggi nessuna traduzione con Gemini.";
+    var out = Object.keys(quota.exhausted).map(function (k) { return k.replace(/^gemini-/, ""); });
+    if (out.length) txt += " Finiti per oggi: " + out.join(", ") + ".";
+    $("usage").textContent = txt + " Il conteggio gratuito riparte alle " + resetClock() + ".";
+    var n = Object.keys(cache).length;
+    $("forget").textContent = "Dimentica le frasi già tradotte (" + n + ")";
+    $("forget").disabled = !n;
+  }
   function openSheet(focus) {
     updateSettingsUI();
+    updateUsage();
     $("api-key").value = state.settings.key;
     $("model").value = state.settings.model;
     $("clear-confirm").hidden = true;
@@ -1297,12 +1819,20 @@
     status.className = "fhelp";
     status.textContent = "Verifico la chiave…";
     $("key-save").disabled = true;
-    gemini([{ text: 'Reply with {"ok": true}' }], {
-      type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"]
-    }).then(function () {
+    // Asking for the model list checks the key without using up a translation.
+    listModels(k).then(function (list) {
+      var picked = pickModels(list);
+      quota.models = picked.lite.length || picked.flash.length ? picked : null;
+      quota.modelsAt = Date.now();
+      quota.unavailable = {};
+      quota.exhausted = {};
+      cooldown = {};
+      noThinking = {};
+      saveQuota();
       status.className = "fhelp key-ok";
       status.textContent = "Chiave valida. Puoi iniziare.";
       checkKeyBanner();
+      updateUsage();
     }).catch(function (e) {
       status.className = "fhelp key-bad";
       status.textContent = e && e.code === "rate_limited"
@@ -1311,6 +1841,12 @@
     }).then(function () {
       $("key-save").disabled = false;
     });
+  });
+
+  $("forget").addEventListener("click", function () {
+    cache = {};
+    saveCache();
+    updateUsage();
   });
 
   $("clear").addEventListener("click", function () { $("clear-confirm").hidden = false; });
@@ -1329,16 +1865,20 @@
     if (e.key !== "Escape") return;
     if (!$("big").hidden) $("big").hidden = true;
     else if (!sheet.hidden) closeSheet();
+    else if (!$("phrases").hidden) closePhrases();
   });
 
   // ---------- boot ----------
   load();
+  loadExtras();
+  rollDay();
   if (!state.messages.length) state.messages = EXAMPLES.map(function (x) { return JSON.parse(JSON.stringify(x)); });
   updateTo();
   updateRecUI();
   render();
   scrollToEnd();
   checkKeyBanner();
+  if (state.settings.key && Date.now() - quota.modelsAt > 3 * 86400000) refreshModels();
   if (!window.isSecureContext) {
     showBanner("Per usare il microfono l'app va aperta da un indirizzo https://.", "error");
   }
