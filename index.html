@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tarjman</title>
+<meta name="description" content="Interprete tascabile italiano ⇄ darija: registra, trascrive e traduce.">
+<meta name="theme-color" content="#F2F3FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0F1B" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tarjman">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Noto+Naskh+Arabic:wght@500;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #F2F3FA;
+    --surface: #FFFFFF;
+    --ink: #17182A;
+    --muted: #5B5E7D;
+    --line: #D9DBEA;
+    --maj: #4034C8;
+    --on-maj: #FFFFFF;
+    --maj-soft: #E7E5FA;
+    --maj-ink: #2D2496;
+    --mint: #0E6B52;
+    --on-mint: #FFFFFF;
+    --mint-soft: #DCEFE8;
+    --mint-ink: #0A5540;
+    --saff-soft: #FBF0D2;
+    --saff-ink: #6B4A00;
+    --danger: #A8231B;
+    --danger-soft: #FBE3E1;
+    --rec: #D93A2B;
+    --focus: #E0A526;
+    --scrim: rgba(14, 15, 27, .45);
+    --shadow: 0 1px 2px rgba(23, 24, 42, .06), 0 6px 20px rgba(23, 24, 42, .08);
+    --f-ui: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-ar: "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", Tahoma, serif;
+    --f-mark: "Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --ground: #0E0F1B;
+      --surface: #181A2B;
+      --ink: #ECEDF8;
+      --muted: #A2A5C4;
+      --line: #2C2F48;
+      --maj: #968DFF;
+      --on-maj: #0E0F1B;
+      --maj-soft: #23214A;
+      --maj-ink: #C9C4FF;
+      --mint: #4FCBA2;
+      --on-mint: #06201A;
+      --mint-soft: #13302A;
+      --mint-ink: #9BE6CB;
+      --saff-soft: #3A2E10;
+      --saff-ink: #F3D27E;
+      --danger: #FF8A80;
+      --danger-soft: #3A1715;
+      --rec: #FF6B5C;
+      --focus: #F2C14E;
+      --scrim: rgba(0, 0, 0, .6);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .3);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-ui);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  [hidden] { display: none !important; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .app {
+    height: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .top { display: flex; align-items: center; gap: 10px; padding-block: 12px 8px; }
+  .mark { width: 28px; height: 28px; flex: none; }
+  .mark .star { fill: var(--maj); }
+  .mark .core { fill: var(--mint); }
+  .brand { font-family: var(--f-mark); font-weight: 700; font-size: 1.4rem; letter-spacing: -0.01em; line-height: 1; }
+  .brand-sub { display: block; font-family: var(--f-ui); font-weight: 400; font-size: .78rem; letter-spacing: .02em; color: var(--muted); margin-top: 3px; }
+  .spacer { flex: 1; }
+  .icon-btn {
+    width: 44px; height: 44px; display: grid; place-items: center;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer;
+  }
+  .icon-btn svg { width: 22px; height: 22px; }
+
+  .banner {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+    background: var(--danger-soft); color: var(--danger);
+    border-radius: 12px; padding: 10px 12px; font-size: .95rem; margin-bottom: 6px;
+  }
+  .banner.info { background: var(--saff-soft); color: var(--saff-ink); }
+  .banner span { flex: 1 1 14em; }
+
+  /* Thread */
+  .thread {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: 14px; padding-block: 8px 16px;
+  }
+  .thread-note { align-self: center; text-align: center; color: var(--muted); font-size: .85rem; max-width: 34ch; text-wrap: balance; margin: 0; }
+
+  .msg { max-width: 92%; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .msg.me { align-self: flex-end; background: var(--mint-soft); border-bottom-right-radius: 6px; }
+  .msg.fam { align-self: flex-start; background: var(--maj-soft); border-bottom-left-radius: 6px; }
+  .who {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .msg.me .who { color: var(--mint-ink); }
+  .msg.fam .who { color: var(--maj-ink); }
+  .who .to-tag { font-weight: 400; letter-spacing: .04em; opacity: .85; }
+  .who .ex-tag { border: 1px dashed currentColor; border-radius: 999px; padding: 1px 8px; letter-spacing: .06em; }
+
+  .src { color: var(--muted); font-size: .98rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .src.src-ar { font-family: var(--f-ar); font-size: 1.1rem; }
+  .src.src-audio { font-style: italic; }
+  .label { display: block; font-style: normal; font-weight: 700; font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 1px; }
+  .ar { font-family: var(--f-ar); font-weight: 500; font-size: 1.75rem; line-height: 1.75; direction: rtl; text-align: right; overflow-wrap: anywhere; }
+  .lat { font-style: italic; font-size: 1.1rem; overflow-wrap: anywhere; }
+  .heard { font-style: italic; font-size: .98rem; color: var(--muted); overflow-wrap: anywhere; }
+  .it { font-size: 1.32rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+  .note { background: var(--saff-soft); color: var(--saff-ink); border-radius: 10px; padding: 8px 10px; font-size: .93rem; }
+  .reply { background: var(--surface); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .reply .ar { font-size: 1.45rem; }
+  .reply .lat { font-size: 1rem; }
+  .reply .mean { font-size: .92rem; color: var(--muted); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip-btn {
+    font-size: .88rem; font-weight: 700; padding: 6px 13px; min-height: 36px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer;
+  }
+  .chip-btn.quiet { background: transparent; }
+  .chip-btn.danger { border-color: var(--danger); color: var(--danger); }
+  .tts-only { display: none !important; }
+  .has-tts .tts-only { display: inline-block !important; }
+
+  .pending { color: var(--muted); font-weight: 700; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .err {
+    background: var(--danger-soft); color: var(--danger); border-radius: 10px;
+    padding: 8px 10px; font-size: .93rem;
+  }
+
+  /* Dock */
+  .dock { border-top: 1px solid var(--line); padding-block: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .to-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .88rem; color: var(--muted); }
+  .pill {
+    font-size: .88rem; padding: 5px 12px; min-height: 34px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); cursor: pointer;
+  }
+  .pill[aria-checked="true"] { border-color: var(--mint); background: var(--mint-soft); color: var(--mint-ink); font-weight: 700; }
+
+  .rec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rec {
+    position: relative;
+    min-height: 92px; border: 0; border-radius: 22px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 10px 8px; line-height: 1.15; touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+  }
+  .rec svg { width: 26px; height: 26px; margin-bottom: 2px; }
+  .rec-title { font-weight: 700; font-size: 1.08rem; }
+  .rec-sub { font-size: .8rem; opacity: .9; }
+  .rec-dar { background: var(--maj); color: var(--on-maj); }
+  .rec-it { background: var(--mint); color: var(--on-mint); }
+  .rec:disabled { opacity: .35; cursor: default; }
+  .rec.is-rec { background: var(--rec); color: #fff; }
+  .rec.is-rec::after {
+    content: ""; position: absolute; inset: -5px; border-radius: 26px;
+    border: 3px solid var(--rec); animation: ring 1.4s ease-out infinite;
+  }
+  @keyframes ring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.06); } }
+  .rec .i-stop { display: none; }
+  .rec.is-rec .i-mic { display: none; }
+  .rec.is-rec .i-stop { display: block; }
+
+  .rec-status { display: flex; align-items: center; gap: 10px; font-size: .92rem; color: var(--muted); }
+  .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rec); flex: none; animation: pulse 1s ease-in-out infinite; }
+  #rec-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); min-width: 3.2em; }
+  .meter { flex: 1; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .meter > div { height: 100%; width: 0%; background: var(--rec); border-radius: inherit; transition: width .08s linear; }
+
+  .dock-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .85rem; color: var(--muted); }
+  .link-btn { border: 0; background: none; padding: 4px 0; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: inherit; color: var(--ink); }
+
+  .text-row { display: flex; flex-direction: column; gap: 8px; }
+  #msg {
+    width: 100%; font-size: 1.06rem; line-height: 1.4; padding: 11px 12px; min-height: 48px; max-height: 140px;
+    border-radius: 14px; border: 1px solid var(--line); background: var(--surface); resize: none;
+  }
+  #msg::placeholder { color: var(--muted); }
+  .text-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .send { height: 46px; border: 0; border-radius: 14px; font-weight: 700; cursor: pointer; }
+  .send-it { background: var(--mint); color: var(--on-mint); }
+  .send-dar { background: var(--maj); color: var(--on-maj); }
+
+  /* Settings sheet */
+  .backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 21;
+    max-width: 720px; margin: 0 auto; max-height: 90%; overflow-y: auto;
+    background: var(--surface); border-radius: 20px 20px 0 0; box-shadow: var(--shadow);
+    padding: 18px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .sheet h2 { margin: 0; font-family: var(--f-mark); font-size: 1.3rem; }
+  .sheet h3 { margin: 0 0 6px; font-size: 1rem; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .flabel { font-weight: 700; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fhelp { margin: 0; font-size: .88rem; color: var(--muted); max-width: 60ch; }
+  .fhelp a { color: var(--ink); font-weight: 700; }
+  .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .key-row input, .field input[type="text"] {
+    flex: 1 1 12em; min-width: 0; font-size: 16px; padding: 10px 12px; min-height: 44px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--ground);
+  }
+  .key-ok { color: var(--mint-ink); font-weight: 700; }
+  .key-bad { color: var(--danger); font-weight: 700; }
+  .sheet ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; font-size: .95rem; max-width: 62ch; }
+  .legend { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  .legend td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+  .legend td:first-child { font-weight: 700; width: 3.2em; }
+  .legend td:nth-child(2) { font-family: var(--f-ar); font-size: 1.25rem; width: 2.4em; text-align: center; }
+  details summary { cursor: pointer; font-weight: 700; }
+  details[open] summary { margin-bottom: 8px; }
+  .clear-zone { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .95rem; }
+
+  /* Big display */
+  .big {
+    position: fixed; inset: 0; z-index: 30; background: var(--surface);
+    display: flex; flex-direction: column; gap: 16px;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  .big-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; gap: 18px; text-align: center; }
+  .big-ar { font-family: var(--f-ar); font-weight: 700; font-size: clamp(2.2rem, 10vw, 4.6rem); line-height: 1.6; direction: rtl; overflow-wrap: anywhere; text-wrap: balance; }
+  .big-lat { font-style: italic; font-size: clamp(1.2rem, 5vw, 2rem); overflow-wrap: anywhere; }
+  .big-it { color: var(--muted); font-size: 1rem; }
+  .big-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .big-actions button {
+    min-height: 52px; padding-inline: 24px; border-radius: 14px; font-weight: 700; font-size: 1.05rem;
+    cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+  }
+  .big-actions .primary { background: var(--maj); color: var(--on-maj); border-color: var(--maj); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pending, .rec-dot, .rec.is-rec::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect class="star" x="7" y="7" width="18" height="18" rx="1.5"></rect>
+      <rect class="star" x="7" y="7" width="18" height="18" rx="1.5" transform="rotate(45 16 16)"></rect>
+      <circle class="core" cx="16" cy="16" r="4.4"></circle>
+    </svg>
+    <div class="brand">Tarjman<span class="brand-sub">italiano ⇄ darija</span></div>
+    <div class="spacer"></div>
+    <button id="open-settings" class="icon-btn" type="button" aria-label="Impostazioni e aiuto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h9M19 7h1M4 17h3M13 17h7"></path>
+        <circle cx="16" cy="7" r="2.4"></circle>
+        <circle cx="10" cy="17" r="2.4"></circle>
+      </svg>
+    </button>
+  </header>
+
+  <div id="banner" class="banner" role="status" hidden><span id="banner-text"></span><button id="banner-btn" class="chip-btn" type="button" hidden></button></div>
+
+  <main id="thread" class="thread" aria-live="polite"></main>
+
+  <div class="dock">
+    <div id="to-row" class="to-row" role="radiogroup" aria-label="A chi parli">
+      <span>Parli a</span>
+      <button id="to-m" class="pill" type="button" role="radio" data-to="m">un uomo</button>
+      <button id="to-f" class="pill" type="button" role="radio" data-to="f">una donna</button>
+      <button id="to-g" class="pill" type="button" role="radio" data-to="g">più persone</button>
+    </div>
+
+    <div class="rec-row">
+      <button id="rec-dar" class="rec rec-dar" type="button" aria-pressed="false">
+        <svg class="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+        <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"></rect></svg>
+        <span class="rec-title">Parlano loro</span>
+        <span class="rec-sub">darija → italiano</span>
+      </button>
+      <button id="rec-it" class="rec rec-it" type="button" aria-pressed="false">
+        <svg class="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+        <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"></rect></svg>
+        <span class="rec-title">Parlo io</span>
+        <span class="rec-sub">italiano → darija</span>
+      </button>
+    </div>
+
+    <div id="rec-status" class="rec-status" hidden>
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span id="rec-time">0:00</span>
+      <div class="meter" aria-hidden="true"><div id="rec-level"></div></div>
+      <button id="rec-cancel" class="link-btn" type="button">Annulla</button>
+    </div>
+
+    <div id="text-row" class="text-row" hidden>
+      <textarea id="msg" rows="1" dir="auto" autocomplete="off" aria-label="Frase da tradurre" placeholder="Scrivi una frase…"></textarea>
+      <div class="text-actions">
+        <button id="send-dar" class="send send-dar" type="button">In italiano</button>
+        <button id="send-it" class="send send-it" type="button">In darija</button>
+      </div>
+    </div>
+
+    <div class="dock-foot">
+      <span id="dock-hint">Tocca per registrare, tocca di nuovo per tradurre.</span>
+      <button id="toggle-text" class="link-btn" type="button" aria-expanded="false">Scrivi</button>
+    </div>
+  </div>
+</div>
+
+<div id="sheet-backdrop" class="backdrop" hidden></div>
+<section id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="sheet-head">
+    <h2 id="sheet-title">Impostazioni</h2>
+    <button id="close-settings" class="chip-btn" type="button">Fatto</button>
+  </div>
+
+  <div class="field" id="key-field">
+    <label class="flabel" for="api-key">Chiave API di Gemini</label>
+    <div class="key-row">
+      <input id="api-key" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Incolla qui la chiave">
+      <button id="key-save" class="chip-btn" type="button">Salva e prova</button>
+    </div>
+    <p id="key-status" class="fhelp" role="status"></p>
+    <ol>
+      <li>Apri <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> e accedi con Google.</li>
+      <li>Premi "Create API key" e copia la chiave.</li>
+      <li>Incollala qui sopra e premi "Salva e prova".</li>
+    </ol>
+    <p class="fhelp">La chiave resta salvata solo su questo telefono, in questa app.</p>
+  </div>
+
+  <div class="field">
+    <span class="flabel" id="me-label">Io sono</span>
+    <div class="pills" role="radiogroup" aria-labelledby="me-label">
+      <button id="me-m" class="pill" type="button" role="radio">Uomo</button>
+      <button id="me-f" class="pill" type="button" role="radio">Donna</button>
+    </div>
+    <p class="fhelp">In darija molte parole cambiano se chi parla è un uomo o una donna.</p>
+  </div>
+
+  <div class="field">
+    <span class="flabel" id="tier-label">Traduzione</span>
+    <div class="pills" role="radiogroup" aria-labelledby="tier-label">
+      <button id="tier-quick" class="pill" type="button" role="radio">Veloce</button>
+      <button id="tier-deep" class="pill" type="button" role="radio">Più accurata</button>
+    </div>
+    <p class="fhelp">"Più accurata" fa ragionare il modello prima di rispondere: meglio con frasi lunghe o audio rumorosi, ma ci mette qualche secondo in più.</p>
+  </div>
+
+  <div class="field">
+    <span class="flabel" id="speak-label">Leggi ad alta voce la mia frase in darija</span>
+    <div class="pills" role="radiogroup" aria-labelledby="speak-label">
+      <button id="speak-on" class="pill" type="button" role="radio">Sì, subito</button>
+      <button id="speak-off" class="pill" type="button" role="radio">No</button>
+    </div>
+    <p id="speak-help" class="fhelp">Usa la voce araba del telefono: l'accento non è marocchino, ma di solito si capisce.</p>
+  </div>
+
+  <div>
+    <h3>Se il microfono non parte</h3>
+    <ol>
+      <li>La prima volta Safari chiede il permesso: tocca "Consenti".</li>
+      <li>Se l'hai negato: in Safari apri le impostazioni del sito (icona "aA" o menu della pagina) → Microfono → Consenti.</li>
+      <li>Tieni il telefono a circa un palmo da chi parla, e una persona alla volta.</li>
+    </ol>
+  </div>
+
+  <div>
+    <h3>Come leggere la pronuncia</h3>
+    <div style="overflow-x:auto">
+      <table class="legend">
+        <tr><td>3</td><td>ع</td><td>una "a" che parte dal fondo della gola</td></tr>
+        <tr><td>7</td><td>ح</td><td>una "h" soffiata forte</td></tr>
+        <tr><td>9</td><td>ق</td><td>una "k" pronunciata in gola</td></tr>
+        <tr><td>kh</td><td>خ</td><td>come la "j" spagnola di "Juan"</td></tr>
+        <tr><td>gh</td><td>غ</td><td>come la "r" francese</td></tr>
+        <tr><td>sh</td><td>ش</td><td>come "sc" in "scena"</td></tr>
+        <tr><td>j</td><td>ج</td><td>come la "j" francese di "jour"</td></tr>
+      </table>
+    </div>
+    <p class="fhelp" style="margin-top:6px">Le vocali si leggono come in italiano.</p>
+  </div>
+
+  <details>
+    <summary>Avanzate</summary>
+    <div class="field">
+      <label class="flabel" for="model">Modello Gemini</label>
+      <input id="model" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="gemini-2.5-flash">
+      <p class="fhelp">Lascia vuoto per usare gemini-2.5-flash. Se un giorno non esiste più, l'app passa da sola a gemini-flash-latest.</p>
+    </div>
+  </details>
+
+  <div class="clear-zone">
+    <button id="clear" class="chip-btn danger" type="button">Nuova conversazione</button>
+    <div id="clear-confirm" class="confirm" hidden>
+      <span>Cancellare tutta la conversazione?</span>
+      <button id="clear-yes" class="chip-btn danger" type="button">Sì, cancella</button>
+      <button id="clear-no" class="chip-btn" type="button">Annulla</button>
+    </div>
+  </div>
+</section>
+
+<div id="big" class="big" role="dialog" aria-modal="true" aria-label="Frase da mostrare" hidden>
+  <div class="big-body">
+    <div id="big-ar" class="big-ar" lang="ar"></div>
+    <div id="big-lat" class="big-lat"></div>
+    <div id="big-it" class="big-it"></div>
+  </div>
+  <div class="big-actions">
+    <button id="big-say" class="tts-only" type="button">Ascolta</button>
+    <button id="big-close" class="primary" type="button">Chiudi</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE_KEY = "tarjman.app.v1";
+  var API = "https://generativelanguage.googleapis.com/v1beta/models/";
+  var DEFAULT_MODEL = "gemini-2.5-flash";
+  var FALLBACK_MODEL = "gemini-flash-latest";
+  var MAX_SECONDS = 60;
+  var ARABIC_RE = /[؀-ۿݐ-ݿ]/;
+  var TO_LABEL = { m: "a un uomo", f: "a una donna", g: "a più persone" };
+  var TO_PROMPT = {
+    m: "one man (masculine singular 'nta' forms)",
+    f: "one woman (feminine singular 'nti' forms)",
+    g: "several people (plural 'ntuma' forms)"
+  };
+  var LAT_RULES =
+    'Rules for every Latin-letter field: vowels read as in Italian; sh = ش, kh = خ, gh = غ, j = ج (as in French "jour"), ' +
+    "3 = ع, 7 = ح, 9 = ق; write u, never ou; plain spaces between words; no accents or diacritics.";
+  var SETTING = "You are a live interpreter at a family gathering in Morocco. The user speaks Italian and does not speak Darija. " +
+    "The relatives speak Moroccan Darija (everyday urban Darija as spoken around Casablanca), which naturally mixes in French words.";
+
+  var SCHEMA_IT2DAR = {
+    type: "OBJECT",
+    properties: {
+      heard: { type: "STRING", description: "What the user said, in Italian" },
+      ar: { type: "STRING", description: "The Darija translation in Arabic script" },
+      lat: { type: "STRING", description: "The same Darija in Latin letters" },
+      note: { type: "STRING", description: "Short note in Italian, or empty" }
+    },
+    required: ["heard", "ar", "lat", "note"],
+    propertyOrdering: ["heard", "ar", "lat", "note"]
+  };
+  var SCHEMA_DAR2IT = {
+    type: "OBJECT",
+    properties: {
+      heard: { type: "STRING", description: "What the relative said, as Darija in Arabic script" },
+      lat: { type: "STRING", description: "The same Darija in Latin letters" },
+      it: { type: "STRING", description: "Italian translation" },
+      note: { type: "STRING", description: "Short note in Italian, or empty" },
+      reply: {
+        type: "OBJECT",
+        nullable: true,
+        properties: {
+          ar: { type: "STRING" },
+          lat: { type: "STRING" },
+          it: { type: "STRING" }
+        },
+        required: ["ar", "lat", "it"]
+      }
+    },
+    required: ["heard", "lat", "it", "note"],
+    propertyOrdering: ["heard", "lat", "it", "note", "reply"]
+  };
+
+  var EXAMPLES = [
+    {
+      id: "ex1", dir: "dar2it", kind: "text", example: true, status: "done",
+      src: "مرحبا بيك! الحمد لله على السلامة",
+      out: {
+        it: "Benvenuto! Grazie a Dio sei arrivato sano e salvo.",
+        lat: "merhba bik! l7amdulillah 3la slama",
+        note: "Si dice a chi arriva da un viaggio.",
+        reply: { ar: "الله يسلمك", lat: "Allah ysellmek", it: "Dio ti protegga" }
+      }
+    },
+    {
+      id: "ex2", dir: "it2dar", kind: "text", example: true, status: "done", to: "g",
+      src: "Grazie! Sono un po' stanco, ma felicissimo di essere qui con voi.",
+      out: {
+        ar: "شكرا! عيان شوية، ولكن فرحان بزاف حيت أنا هنا معاكم.",
+        lat: "shukran! 3yan shwiya, walakin fer7an bzaf 7it ana hna m3akum.",
+        note: ""
+      }
+    }
+  ];
+
+  var state = {
+    settings: { key: "", model: "", me: "m", to: "m", tier: "quick", speak: false },
+    messages: []
+  };
+  var audioStore = {}; // id -> { wav: ArrayBuffer, url: string } (this session only)
+
+  // ---------- storage ----------
+  function load() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+      if (!saved) return;
+      var s = saved.settings || {};
+      if (typeof s.key === "string") state.settings.key = s.key;
+      if (typeof s.model === "string") state.settings.model = s.model;
+      if (s.me === "m" || s.me === "f") state.settings.me = s.me;
+      if (s.to === "m" || s.to === "f" || s.to === "g") state.settings.to = s.to;
+      if (s.tier === "quick" || s.tier === "deep") state.settings.tier = s.tier;
+      state.settings.speak = s.speak === true;
+      if (Array.isArray(saved.messages)) {
+        state.messages = saved.messages.filter(function (m) {
+          return m && (m.dir === "it2dar" || m.dir === "dar2it") && typeof m.src === "string";
+        }).map(function (m) {
+          if (m.status === "pending") { m.status = "error"; m.err = "Traduzione interrotta."; }
+          return m;
+        });
+      }
+    } catch (e) { /* start fresh */ }
+  }
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        settings: state.settings,
+        messages: state.messages.filter(function (m) { return !m.example; }).slice(-100)
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, txt) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (txt != null) n.textContent = txt;
+    return n;
+  }
+  function btn(label, cls, onClick) {
+    var b = el("button", cls || "chip-btn", label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function str(v) { return typeof v === "string" ? v.trim() : ""; }
+  function uid() { return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  }
+  function flash(b, text) {
+    var old = b.textContent;
+    b.textContent = text;
+    setTimeout(function () { b.textContent = old; }, 1400);
+  }
+
+  var threadEl = $("thread");
+
+  // ---------- banner ----------
+  var bannerAction = null;
+  function showBanner(text, kind, actionLabel, action) {
+    $("banner").className = "banner" + (kind === "info" ? " info" : "");
+    $("banner-text").textContent = text;
+    var b = $("banner-btn");
+    bannerAction = action || null;
+    b.hidden = !actionLabel;
+    if (actionLabel) b.textContent = actionLabel;
+    $("banner").hidden = false;
+  }
+  function hideBanner() { $("banner").hidden = true; }
+  $("banner-btn").addEventListener("click", function () {
+    var a = bannerAction;
+    hideBanner();
+    if (a) a();
+  });
+  function checkKeyBanner() {
+    if (!state.settings.key) {
+      showBanner("Per iniziare serve la tua chiave Gemini (gratuita).", "info", "Inserisci chiave", function () { openSheet("key"); });
+    } else if ($("banner").className.indexOf("info") !== -1) {
+      hideBanner();
+    }
+  }
+
+  // ---------- speech output ----------
+  var arVoice = null;
+  function pickVoice() {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      arVoice = vs.find(function (v) { return /^ar[-_]MA/i.test(v.lang); }) ||
+                vs.find(function (v) { return /^ar/i.test(v.lang); }) || null;
+    } catch (e) { arVoice = null; }
+    document.documentElement.classList.toggle("has-tts", !!arVoice);
+  }
+  if ("speechSynthesis" in window) {
+    pickVoice();
+    try { window.speechSynthesis.addEventListener("voiceschanged", pickVoice); }
+    catch (e) { window.speechSynthesis.onvoiceschanged = pickVoice; }
+  }
+  var speechUnlocked = false;
+  function unlockSpeech() {
+    // iOS only lets speech start from a tap: speak an empty line once during one.
+    if (speechUnlocked || !("speechSynthesis" in window)) return;
+    speechUnlocked = true;
+    try { window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) { /* ignore */ }
+  }
+  function speak(text) {
+    if (!arVoice || !text) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.voice = arVoice;
+      u.lang = arVoice.lang;
+      u.rate = 0.88;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- keep the screen on ----------
+  var wakeWanted = false, wakeLock = null;
+  function keepAwake() {
+    wakeWanted = true;
+    if (wakeLock || !navigator.wakeLock) return;
+    navigator.wakeLock.request("screen").then(function (lock) {
+      wakeLock = lock;
+      lock.addEventListener("release", function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && wakeWanted) keepAwake();
+    if (document.visibilityState === "hidden" && rec) stopAndTranslate();
+  });
+
+  // ---------- copy ----------
+  function copyText(text, b) {
+    try {
+      navigator.clipboard.writeText(text).then(function () { flash(b, "Copiato"); }, function () { fallbackCopy(text, b); });
+    } catch (e) { fallbackCopy(text, b); }
+  }
+  function fallbackCopy(text, b) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    flash(b, ok ? "Copiato" : "Copia non riuscita");
+  }
+
+  // ---------- big display ----------
+  var bigText = "";
+  function showBig(ar, lat, it) {
+    bigText = ar;
+    $("big-ar").textContent = ar;
+    $("big-lat").textContent = lat || "";
+    $("big-it").textContent = it || "";
+    $("big").hidden = false;
+    $("big-close").focus();
+  }
+  $("big-close").addEventListener("click", function () { $("big").hidden = true; });
+  $("big-say").addEventListener("click", function () { speak(bigText); });
+
+  // ---------- audio: record -> 16 kHz mono WAV ----------
+  var rec = null;
+
+  function recSupported() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
+  }
+
+  function onRecButton(dir) {
+    unlockSpeech();
+    if (rec) {
+      if (rec.dir === dir) stopAndTranslate();
+      return;
+    }
+    if (!state.settings.key) { openSheet("key"); return; }
+    if (!recSupported()) {
+      showBanner("Questo browser non permette di registrare. Su iPhone apri l'app con Safari.", "error");
+      return;
+    }
+    startRec(dir);
+  }
+
+  function startRec(dir) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx;
+    try { ctx = new AC(); } catch (e) {
+      showBanner("Non riesco ad avviare la registrazione su questo dispositivo.", "error");
+      return;
+    }
+    try { ctx.resume(); } catch (e) { /* ignore */ }
+    rec = { dir: dir, ctx: ctx, chunks: [], ready: false, start: 0, level: 0, timer: null };
+    updateRecUI();
+    keepAwake();
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    }).then(function (stream) {
+      if (!rec || rec.ctx !== ctx) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        try { ctx.close(); } catch (e) { /* ignore */ }
+        return;
+      }
+      var r = rec;
+      r.stream = stream;
+      r.source = ctx.createMediaStreamSource(stream);
+      r.proc = ctx.createScriptProcessor(4096, 1, 1);
+      r.proc.onaudioprocess = function (e) {
+        if (!r.ready) return;
+        var d = e.inputBuffer.getChannelData(0);
+        r.chunks.push(new Float32Array(d));
+        var sum = 0, n = 0;
+        for (var i = 0; i < d.length; i += 8) { sum += d[i] * d[i]; n++; }
+        r.level = Math.sqrt(sum / Math.max(1, n));
+      };
+      r.source.connect(r.proc);
+      r.proc.connect(ctx.destination);
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) { /* ignore */ } }
+      r.ready = true;
+      r.start = performance.now();
+      r.timer = setInterval(tick, 100);
+      updateRecUI();
+    }).catch(function (err) {
+      cleanupRec();
+      var name = err && err.name;
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        showBanner("Il microfono è bloccato. In Safari apri le impostazioni del sito (icona \"aA\" o menu della pagina) → Microfono → Consenti, poi riprova.", "error");
+      } else if (name === "NotFoundError") {
+        showBanner("Non trovo un microfono su questo dispositivo.", "error");
+      } else {
+        showBanner("Non riesco ad accedere al microfono (" + (name || "errore") + "). Riprova.", "error");
+      }
+    });
+  }
+
+  function tick() {
+    if (!rec || !rec.ready) return;
+    var sec = (performance.now() - rec.start) / 1000;
+    $("rec-time").textContent = fmtTime(sec);
+    $("rec-level").style.width = Math.min(100, Math.round(rec.level * 400)) + "%";
+    if (sec >= MAX_SECONDS) stopAndTranslate();
+  }
+
+  function cleanupRec() {
+    if (!rec) return;
+    var r = rec;
+    rec = null;
+    if (r.timer) clearInterval(r.timer);
+    try { if (r.proc) { r.proc.onaudioprocess = null; r.proc.disconnect(); } } catch (e) { /* ignore */ }
+    try { if (r.source) r.source.disconnect(); } catch (e) { /* ignore */ }
+    try { if (r.stream) r.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* ignore */ }
+    try { r.ctx.close(); } catch (e) { /* ignore */ }
+    updateRecUI();
+  }
+
+  function stopAndTranslate() {
+    if (!rec) return;
+    var r = rec;
+    if (!r.ready) { cleanupRec(); return; }
+    var dur = (performance.now() - r.start) / 1000;
+    var rate = r.ctx.sampleRate;
+    var samples = mergeChunks(r.chunks);
+    cleanupRec();
+    if (dur < 0.7 || samples.length < rate * 0.5) {
+      $("dock-hint").textContent = "Troppo breve: tocca, parla, poi tocca di nuovo.";
+      return;
+    }
+    var pcm = normalizePeak(downsample(samples, rate, 16000));
+    var wav = encodeWav(pcm, 16000);
+    var m = {
+      id: uid(), dir: r.dir, kind: "audio", src: "", secs: Math.round(dur),
+      to: r.dir === "it2dar" ? state.settings.to : null, status: "pending", ts: Date.now()
+    };
+    audioStore[m.id] = { wav: wav, url: URL.createObjectURL(new Blob([wav], { type: "audio/wav" })) };
+    addMessage(m);
+  }
+
+  function cancelRec() { cleanupRec(); }
+
+  function mergeChunks(chunks) {
+    var len = 0, i;
+    for (i = 0; i < chunks.length; i++) len += chunks[i].length;
+    var out = new Float32Array(len), off = 0;
+    for (i = 0; i < chunks.length; i++) { out.set(chunks[i], off); off += chunks[i].length; }
+    return out;
+  }
+  function downsample(buf, rate, target) {
+    if (rate <= target) return buf;
+    var ratio = rate / target;
+    var len = Math.floor(buf.length / ratio);
+    var out = new Float32Array(len);
+    for (var i = 0; i < len; i++) {
+      var a = Math.floor(i * ratio), b = Math.min(buf.length, Math.floor((i + 1) * ratio));
+      var sum = 0;
+      for (var j = a; j < b; j++) sum += buf[j];
+      out[i] = b > a ? sum / (b - a) : 0;
+    }
+    return out;
+  }
+  function normalizePeak(buf) {
+    var peak = 0;
+    for (var i = 0; i < buf.length; i++) { var v = Math.abs(buf[i]); if (v > peak) peak = v; }
+    if (peak < 0.01 || peak > 0.5) return buf;
+    var g = 0.9 / peak;
+    for (var k = 0; k < buf.length; k++) buf[k] *= g;
+    return buf;
+  }
+  function encodeWav(samples, rate) {
+    var buffer = new ArrayBuffer(44 + samples.length * 2);
+    var v = new DataView(buffer);
+    function w(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+    w(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); w(8, "WAVE");
+    w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, "data"); v.setUint32(40, samples.length * 2, true);
+    for (var i = 0, o = 44; i < samples.length; i++, o += 2) {
+      var s = Math.max(-1, Math.min(1, samples[i]));
+      v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
+  }
+  function toBase64(buf) {
+    var bytes = new Uint8Array(buf), bin = "", CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+
+  function updateRecUI() {
+    var active = rec ? rec.dir : null;
+    [["rec-dar", "dar2it", "Parlano loro", "darija → italiano"], ["rec-it", "it2dar", "Parlo io", "italiano → darija"]].forEach(function (c) {
+      var b = $(c[0]);
+      var on = active === c[1];
+      b.classList.toggle("is-rec", on);
+      b.setAttribute("aria-pressed", String(on));
+      b.disabled = !!active && !on;
+      b.querySelector(".rec-title").textContent = on ? (rec.ready ? "Fine · traduci" : "Un attimo…") : c[2];
+      b.querySelector(".rec-sub").textContent = on ? "tocca quando ha finito" : c[3];
+    });
+    $("rec-status").hidden = !active;
+    if (!active) {
+      $("rec-time").textContent = "0:00";
+      $("rec-level").style.width = "0%";
+    }
+  }
+
+  $("rec-dar").addEventListener("click", function () { onRecButton("dar2it"); });
+  $("rec-it").addEventListener("click", function () { onRecButton("it2dar"); });
+  $("rec-cancel").addEventListener("click", cancelRec);
+
+  // ---------- Gemini ----------
+  function currentModel() { return str(state.settings.model) || DEFAULT_MODEL; }
+
+  function callModel(model, parts, schema, key) {
+    var gen = { responseMimeType: "application/json", responseSchema: schema, temperature: 0.2 };
+    if (/^gemini-2\.5-flash/.test(model)) {
+      gen.thinkingConfig = { thinkingBudget: state.settings.tier === "deep" ? -1 : 0 };
+    }
+    var body = JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: gen });
+    return fetch(API + encodeURIComponent(model) + ":generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: body
+    }).catch(function () {
+      throw { code: "network" };
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          var msg = (data && data.error && data.error.message) || "";
+          if (res.status === 404 || /is not found|not supported for generateContent/i.test(msg)) throw { code: "model_not_found", detail: msg };
+          if (/API key not valid|API_KEY_INVALID|API key expired/i.test(msg) || (data && JSON.stringify(data).indexOf("API_KEY_INVALID") !== -1)) throw { code: "bad_key" };
+          if (res.status === 429) throw { code: "rate_limited" };
+          if (res.status >= 500) throw { code: "server" };
+          throw { code: "rejected", detail: msg };
+        }
+        var cand = data && data.candidates && data.candidates[0];
+        if (!cand) throw { code: data && data.promptFeedback && data.promptFeedback.blockReason ? "blocked" : "empty" };
+        var text = ((cand.content && cand.content.parts) || []).map(function (p) { return p.text || ""; }).join("");
+        if (!text) throw { code: cand.finishReason === "SAFETY" ? "blocked" : "empty" };
+        try { return JSON.parse(text); } catch (e) {
+          var mm = text.match(/\{[\s\S]*\}/);
+          if (mm) { try { return JSON.parse(mm[0]); } catch (e2) { /* fall through */ } }
+          throw { code: "bad_json" };
+        }
+      });
+    });
+  }
+
+  function gemini(parts, schema) {
+    var key = str(state.settings.key);
+    if (!key) return Promise.reject({ code: "no_key" });
+    var model = currentModel();
+    return callModel(model, parts, schema, key).catch(function (e) {
+      if (e && e.code === "model_not_found" && model !== FALLBACK_MODEL) return callModel(FALLBACK_MODEL, parts, schema, key);
+      throw e;
+    });
+  }
+
+  function errCopy(e) {
+    var code = e && e.code;
+    switch (code) {
+      case "no_key": return "Manca la chiave Gemini: inseriscila nelle impostazioni.";
+      case "bad_key": return "La chiave Gemini non è valida. Controllala nelle impostazioni.";
+      case "rate_limited": return "Hai raggiunto il limite di Gemini (il piano gratuito ha un tetto al minuto e al giorno). Aspetta un minuto e riprova.";
+      case "network": return "Niente connessione a internet. Riprova quando sei online.";
+      case "server": return "Gemini non risponde in questo momento. Riprova tra poco.";
+      case "blocked": return "Gemini non ha tradotto questo contenuto.";
+      case "model_not_found": return "Il modello scritto nelle impostazioni non esiste. Svuota il campo \"Modello Gemini\".";
+      case "no_audio": return "L'audio non è più disponibile: registra di nuovo.";
+      case "unheard": return e.detail || "Non ho capito l'audio. Riprova più vicino al telefono, una persona alla volta.";
+      case "rejected": return "Gemini ha rifiutato la richiesta" + (e.detail ? ": " + e.detail.slice(0, 180) : ".");
+      default: return "Risposta incompleta. Riprova.";
+    }
+  }
+
+  // ---------- prompts ----------
+  function contextFor(m) {
+    var idx = state.messages.indexOf(m);
+    var prev = state.messages.slice(0, idx < 0 ? state.messages.length : idx).filter(function (x) {
+      return x.status === "done" && !x.example && x.out;
+    }).slice(-6);
+    if (!prev.length) return "";
+    return "Recent conversation, for context only (do not translate it):\n" + prev.map(function (x) {
+      return x.dir === "it2dar"
+        ? "USER (Italian): " + x.src + "\n  said in Darija: " + (x.out.lat || x.out.ar)
+        : "RELATIVE (Darija): " + (x.out.lat || x.src) + "\n  meaning: " + x.out.it;
+    }).join("\n") + "\n";
+  }
+
+  function buildPrompt(m) {
+    var me = state.settings.me === "f" ? "a woman" : "a man";
+    var ctx = contextFor(m);
+    var audio = m.kind === "audio";
+    if (m.dir === "it2dar") {
+      return [
+        SETTING,
+        "",
+        audio
+          ? 'The attached audio is the user speaking Italian. In "heard", write exactly what the user said, in Italian. If the audio is silent or unintelligible, leave "heard", "ar" and "lat" empty and explain briefly in Italian in "note".'
+          : 'The user\'s Italian message is below. Copy it unchanged into "heard".\n<<<\n' + m.src + "\n>>>",
+        "",
+        "Translate what the user said into natural SPOKEN Moroccan Darija, exactly as a Moroccan would say it at home. Do not use Modern Standard Arabic words or grammar where Darija has its own; keep French loanwords where Moroccans would really use them.",
+        "- The user is " + me + ": use matching first-person forms.",
+        "- The user is speaking to " + TO_PROMPT[m.to || "m"] + ".",
+        "- Tone: warm and respectful, as within a family. Keep the meaning; add nothing.",
+        ctx,
+        'Fields: "ar" = the Darija in Arabic script, as Moroccans write it in messages; "lat" = the same Darija in Latin letters, for an Italian to read aloud; "note" = one short note in Italian only if something needs care (politeness, a word with no equivalent, an ambiguity you resolved), otherwise an empty string.',
+        LAT_RULES
+      ].join("\n");
+    }
+    return [
+      SETTING,
+      "",
+      audio
+        ? 'The attached audio is a relative speaking Moroccan Darija, possibly mixed with French, possibly with background noise. In "heard", transcribe what they said in Arabic script, the way Moroccans write Darija (not Modern Standard Arabic); French words may stay in Latin letters. If the audio is silent or unintelligible, leave "heard", "lat" and "it" empty and explain briefly in Italian in "note".'
+        : 'Below is what a relative said, typed or dictated on a phone: it may be Arabic script with recognition errors, Latin letters (Arabizi with 3, 7, 9), French, or a mix. Reconstruct what was most likely said and write it in "heard" in Arabic script, the way Moroccans write Darija.\n<<<\n' + m.src + "\n>>>",
+      "",
+      'Then: "lat" = the same Darija in Latin letters; "it" = a natural, everyday Italian translation; "note" = one short note in Italian only if useful (an uncertainty, or the cultural meaning of an expression), otherwise an empty string.',
+      'If what they said is a customary formula with a set response (for example "l7amdulillah 3la slama" is answered with "Allah ysellmek", "bessa7a" with "Allah y3tik sa7a"), set "reply" to the customary response ("ar" in Arabic script, "lat" in Latin letters, "it" its meaning in Italian); the user answering is ' + me + '. Otherwise set "reply" to null.',
+      ctx,
+      LAT_RULES
+    ].join("\n");
+  }
+
+  function normalize(res, dir) {
+    if (!res || typeof res !== "object") return null;
+    var note = str(res.note), heard = str(res.heard);
+    if (dir === "it2dar") {
+      var ar = str(res.ar), lat = str(res.lat);
+      if (!ar && !lat) return { empty: true, note: note };
+      return { heard: heard, ar: ar, lat: lat, note: note };
+    }
+    var it = str(res.it);
+    if (!it) return { empty: true, note: note };
+    var reply = null;
+    if (res.reply && typeof res.reply === "object" && str(res.reply.ar)) {
+      reply = { ar: str(res.reply.ar), lat: str(res.reply.lat), it: str(res.reply.it) };
+    }
+    return { heard: heard, it: it, lat: str(res.lat), note: note, reply: reply };
+  }
+
+  // ---------- translate ----------
+  function translate(m) {
+    var parts;
+    if (m.kind === "audio") {
+      var a = audioStore[m.id];
+      if (!a) { finish(m, null, { code: "no_audio" }); return; }
+      parts = [{ inlineData: { mimeType: "audio/wav", data: toBase64(a.wav) } }, { text: buildPrompt(m) }];
+    } else {
+      parts = [{ text: buildPrompt(m) }];
+    }
+    gemini(parts, m.dir === "it2dar" ? SCHEMA_IT2DAR : SCHEMA_DAR2IT).then(function (res) {
+      var out = normalize(res, m.dir);
+      if (!out) throw { code: "bad_json" };
+      if (out.empty) throw { code: "unheard", detail: out.note };
+      finish(m, out, null);
+    }).catch(function (e) {
+      finish(m, null, e);
+    });
+  }
+
+  function finish(m, out, e) {
+    if (out) {
+      if (out.heard) m.src = out.heard;
+      delete out.heard;
+      m.out = out;
+      m.status = "done";
+      m.err = null;
+      if (m.dir === "it2dar" && state.settings.speak) speak(out.ar);
+    } else {
+      m.status = "error";
+      m.err = errCopy(e);
+      if (e && (e.code === "bad_key" || e.code === "no_key")) {
+        showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); });
+      }
+    }
+    save();
+    render();
+    scrollToEnd();
+  }
+
+  function addMessage(m) {
+    if (state.messages.some(function (x) { return x.example; })) {
+      state.messages = state.messages.filter(function (x) { return !x.example; });
+    }
+    state.messages.push(m);
+    $("dock-hint").textContent = "Tocca per registrare, tocca di nuovo per tradurre.";
+    save();
+    render();
+    scrollToEnd();
+    keepAwake();
+    translate(m);
+  }
+
+  function sendText(dir) {
+    unlockSpeech();
+    var text = $("msg").value.trim();
+    if (!text) { $("msg").focus(); return; }
+    if (!state.settings.key) { openSheet("key"); return; }
+    if (dir === "it2dar" && ARABIC_RE.test(text)) dir = "dar2it";
+    $("msg").value = "";
+    autosize();
+    addMessage({
+      id: uid(), dir: dir, kind: "text", src: text,
+      to: dir === "it2dar" ? state.settings.to : null, status: "pending", ts: Date.now()
+    });
+  }
+
+  function retry(m) {
+    m.status = "pending";
+    m.err = null;
+    render();
+    translate(m);
+  }
+
+  function correct(m) {
+    state.messages = state.messages.filter(function (x) { return x !== m; });
+    setTextOpen(true);
+    $("msg").value = m.src;
+    autosize();
+    save();
+    render();
+    $("msg").focus();
+  }
+
+  // ---------- render ----------
+  function renderMsg(m) {
+    var mine = m.dir === "it2dar";
+    var b = el("article", "msg " + (mine ? "me" : "fam"));
+
+    var who = el("div", "who");
+    who.appendChild(el("span", null, mine ? "Tu · italiano" : "Famiglia · darija"));
+    if (mine && m.to && TO_LABEL[m.to]) who.appendChild(el("span", "to-tag", TO_LABEL[m.to]));
+    if (m.example) who.appendChild(el("span", "ex-tag", "Esempio"));
+    b.appendChild(who);
+
+    var a = audioStore[m.id];
+    if (m.src) {
+      b.appendChild(el("div", "src" + (ARABIC_RE.test(m.src) ? " src-ar" : ""), m.src)).setAttribute("dir", "auto");
+    } else if (m.kind === "audio") {
+      b.appendChild(el("div", "src src-audio", "Registrazione · " + fmtTime(m.secs || 0)));
+    }
+
+    if (m.status === "pending") {
+      b.appendChild(el("div", "pending", m.kind === "audio" ? "Ascolto e traduco…" : "Traduco…"));
+      return b;
+    }
+
+    var actions = el("div", "actions");
+
+    if (m.status === "error") {
+      b.appendChild(el("div", "err", m.err || "Qualcosa non ha funzionato."));
+      if (m.kind === "text" || a) actions.appendChild(btn("Riprova", "chip-btn", function () { retry(m); }));
+      if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
+      if (m.src) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
+      b.appendChild(actions);
+      return b;
+    }
+
+    var out = m.out || {};
+    if (mine) {
+      if (out.ar) {
+        var ar = el("div", "ar", out.ar);
+        ar.lang = "ar";
+        ar.setAttribute("dir", "rtl");
+        b.appendChild(ar);
+      }
+      if (out.lat) {
+        var lat = el("div", "lat");
+        lat.appendChild(el("span", "label", "Leggi così"));
+        lat.appendChild(document.createTextNode(out.lat));
+        b.appendChild(lat);
+      }
+      if (out.note) b.appendChild(el("div", "note", out.note));
+      actions.appendChild(btn("Mostra grande", "chip-btn", function () { showBig(out.ar || out.lat, out.lat, m.src); }));
+      actions.appendChild(btn("Ascolta", "chip-btn tts-only", function () { speak(out.ar); }));
+      var cp = btn("Copia", "chip-btn quiet", function () { copyText(out.ar || out.lat, cp); });
+      actions.appendChild(cp);
+    } else {
+      if (out.lat) {
+        var heard = el("div", "heard");
+        heard.appendChild(el("span", "label", "Ho capito"));
+        heard.appendChild(document.createTextNode(out.lat));
+        b.appendChild(heard);
+      }
+      b.appendChild(el("div", "it", out.it));
+      if (out.note) b.appendChild(el("div", "note", out.note));
+      if (out.reply && out.reply.ar) {
+        var r = out.reply;
+        var rep = el("div", "reply");
+        rep.appendChild(el("span", "label", "Si risponde così"));
+        var rar = el("div", "ar", r.ar);
+        rar.lang = "ar";
+        rar.setAttribute("dir", "rtl");
+        rep.appendChild(rar);
+        if (r.lat) rep.appendChild(el("div", "lat", r.lat));
+        if (r.it) rep.appendChild(el("div", "mean", r.it));
+        var racts = el("div", "actions");
+        racts.appendChild(btn("Mostra grande", "chip-btn", function () { showBig(r.ar, r.lat, r.it); }));
+        racts.appendChild(btn("Ascolta", "chip-btn tts-only", function () { speak(r.ar); }));
+        rep.appendChild(racts);
+        b.appendChild(rep);
+      }
+      var cp2 = btn("Copia", "chip-btn quiet", function () { copyText(out.it, cp2); });
+      actions.appendChild(cp2);
+    }
+    if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
+    if (!m.example) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
+    b.appendChild(actions);
+    return b;
+  }
+
+  var player = null;
+  function playRec(a) {
+    try {
+      if (player) player.pause();
+      player = new Audio(a.url);
+      player.play().catch(function () {});
+    } catch (e) { /* ignore */ }
+  }
+
+  function render() {
+    threadEl.textContent = "";
+    if (state.messages.some(function (m) { return m.example; })) {
+      threadEl.appendChild(el("p", "thread-note", "Qui sotto c'è un esempio: sparisce appena traduci la prima frase."));
+    }
+    state.messages.forEach(function (m) { threadEl.appendChild(renderMsg(m)); });
+  }
+  function scrollToEnd() {
+    requestAnimationFrame(function () { threadEl.scrollTop = threadEl.scrollHeight; });
+  }
+
+  // ---------- dock ----------
+  function updateTo() {
+    ["m", "f", "g"].forEach(function (k) { $("to-" + k).setAttribute("aria-checked", String(state.settings.to === k)); });
+  }
+  ["m", "f", "g"].forEach(function (k) {
+    $("to-" + k).addEventListener("click", function () { state.settings.to = k; updateTo(); save(); });
+  });
+
+  function setTextOpen(open) {
+    $("text-row").hidden = !open;
+    $("toggle-text").setAttribute("aria-expanded", String(open));
+    $("toggle-text").textContent = open ? "Chiudi" : "Scrivi";
+  }
+  $("toggle-text").addEventListener("click", function () {
+    var open = $("text-row").hidden;
+    setTextOpen(open);
+    if (open) $("msg").focus();
+  });
+  function autosize() {
+    var t = $("msg");
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight + 2, 140) + "px";
+  }
+  $("msg").addEventListener("input", autosize);
+  $("send-it").addEventListener("click", function () { sendText("it2dar"); });
+  $("send-dar").addEventListener("click", function () { sendText("dar2it"); });
+
+  // ---------- settings ----------
+  var sheet = $("sheet"), backdrop = $("sheet-backdrop");
+  function radio(ids, activeId) {
+    ids.forEach(function (id) { $(id).setAttribute("aria-checked", String(id === activeId)); });
+  }
+  function updateSettingsUI() {
+    radio(["me-m", "me-f"], state.settings.me === "f" ? "me-f" : "me-m");
+    radio(["tier-quick", "tier-deep"], state.settings.tier === "deep" ? "tier-deep" : "tier-quick");
+    radio(["speak-on", "speak-off"], state.settings.speak ? "speak-on" : "speak-off");
+    $("speak-help").textContent = arVoice
+      ? "Usa la voce araba del telefono: l'accento non è marocchino, ma di solito si capisce."
+      : "Su questo dispositivo non c'è una voce araba: il pulsante Ascolta resta nascosto.";
+  }
+  function openSheet(focus) {
+    updateSettingsUI();
+    $("api-key").value = state.settings.key;
+    $("model").value = state.settings.model;
+    $("clear-confirm").hidden = true;
+    sheet.hidden = false;
+    backdrop.hidden = false;
+    sheet.scrollTop = 0;
+    if (focus === "key") $("api-key").focus();
+    else $("close-settings").focus();
+  }
+  function closeSheet() {
+    var model = str($("model").value);
+    if (model !== state.settings.model) { state.settings.model = model; save(); }
+    sheet.hidden = true;
+    backdrop.hidden = true;
+  }
+  $("open-settings").addEventListener("click", function () { openSheet(); });
+  $("close-settings").addEventListener("click", closeSheet);
+  backdrop.addEventListener("click", closeSheet);
+
+  $("me-m").addEventListener("click", function () { state.settings.me = "m"; updateSettingsUI(); save(); });
+  $("me-f").addEventListener("click", function () { state.settings.me = "f"; updateSettingsUI(); save(); });
+  $("tier-quick").addEventListener("click", function () { state.settings.tier = "quick"; updateSettingsUI(); save(); });
+  $("tier-deep").addEventListener("click", function () { state.settings.tier = "deep"; updateSettingsUI(); save(); });
+  $("speak-on").addEventListener("click", function () { unlockSpeech(); state.settings.speak = true; updateSettingsUI(); save(); });
+  $("speak-off").addEventListener("click", function () { state.settings.speak = false; updateSettingsUI(); save(); });
+
+  $("key-save").addEventListener("click", function () {
+    var k = str($("api-key").value);
+    var status = $("key-status");
+    state.settings.model = str($("model").value);
+    if (!k) {
+      state.settings.key = "";
+      save();
+      status.className = "fhelp key-bad";
+      status.textContent = "Incolla la chiave prima di salvare.";
+      checkKeyBanner();
+      return;
+    }
+    state.settings.key = k;
+    save();
+    status.className = "fhelp";
+    status.textContent = "Verifico la chiave…";
+    $("key-save").disabled = true;
+    gemini([{ text: 'Reply with {"ok": true}' }], {
+      type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"]
+    }).then(function () {
+      status.className = "fhelp key-ok";
+      status.textContent = "Chiave valida. Puoi iniziare.";
+      checkKeyBanner();
+    }).catch(function (e) {
+      status.className = "fhelp key-bad";
+      status.textContent = e && e.code === "rate_limited"
+        ? "Chiave salvata, ma Gemini dice di aspettare un minuto."
+        : errCopy(e);
+    }).then(function () {
+      $("key-save").disabled = false;
+    });
+  });
+
+  $("clear").addEventListener("click", function () { $("clear-confirm").hidden = false; });
+  $("clear-no").addEventListener("click", function () { $("clear-confirm").hidden = true; });
+  $("clear-yes").addEventListener("click", function () {
+    Object.keys(audioStore).forEach(function (id) { try { URL.revokeObjectURL(audioStore[id].url); } catch (e) { /* ignore */ } });
+    audioStore = {};
+    state.messages = [];
+    save();
+    render();
+    $("clear-confirm").hidden = true;
+    closeSheet();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!$("big").hidden) $("big").hidden = true;
+    else if (!sheet.hidden) closeSheet();
+  });
+
+  // ---------- boot ----------
+  load();
+  if (!state.messages.length) state.messages = EXAMPLES.map(function (x) { return JSON.parse(JSON.stringify(x)); });
+  updateTo();
+  updateRecUI();
+  render();
+  scrollToEnd();
+  checkKeyBanner();
+  if (!window.isSecureContext) {
+    showBanner("Per usare il microfono l'app va aperta da un indirizzo https://.", "error");
+  }
+})();
+</script>
+</body>
+</html>
