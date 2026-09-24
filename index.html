@@ -122,6 +122,7 @@
   }
   .banner.info { background: var(--saff-soft); color: var(--saff-ink); }
   .banner span { flex: 1 1 14em; }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* Thread */
   .thread {
@@ -180,7 +181,7 @@
     font-size: .88rem; padding: 5px 12px; min-height: 34px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--surface); cursor: pointer;
   }
-  .pill[aria-checked="true"] { border-color: var(--mint); background: var(--mint-soft); color: var(--mint-ink); font-weight: 700; }
+  .pill[aria-checked="true"], .pill[aria-pressed="true"] { border-color: var(--mint); background: var(--mint-soft); color: var(--mint-ink); font-weight: 700; }
 
   .rec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .rec {
@@ -214,6 +215,7 @@
 
   .dock-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .85rem; color: var(--muted); }
   .link-btn { border: 0; background: none; padding: 4px 0; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: inherit; color: var(--ink); }
+  .foot-links { display: flex; gap: 16px; flex: none; }
 
   .text-row { display: flex; flex-direction: column; gap: 8px; }
   #msg {
@@ -259,6 +261,21 @@
   details[open] summary { margin-bottom: 8px; }
   .clear-zone { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
   .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .95rem; }
+
+  /* Phrasebook */
+  #phrases { gap: 14px; }
+  .ph-search {
+    width: 100%; font-size: 16px; padding: 10px 12px; min-height: 44px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--ground);
+  }
+  .ph-list { display: flex; flex-direction: column; gap: 6px; }
+  .ph-item {
+    display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
+    padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--ground); cursor: pointer;
+  }
+  .ph-main { font-weight: 700; overflow-wrap: anywhere; }
+  .ph-sub { font-style: italic; color: var(--muted); font-size: .92rem; overflow-wrap: anywhere; }
+  .ph-empty { color: var(--muted); margin: 0; }
 
   /* Big display */
   .big {
@@ -344,8 +361,11 @@
     </div>
 
     <div class="dock-foot">
-      <span id="dock-hint">Tocca per registrare, tocca di nuovo per tradurre.</span>
-      <button id="toggle-text" class="link-btn" type="button" aria-expanded="false">Scrivi</button>
+      <span id="dock-hint">Tocca, parla, poi tocca di nuovo.</span>
+      <span class="foot-links">
+        <button id="open-phrases" class="link-btn" type="button">Frasi pronte</button>
+        <button id="toggle-text" class="link-btn" type="button" aria-expanded="false">Scrivi</button>
+      </span>
     </div>
   </div>
 </div>
@@ -387,7 +407,14 @@
       <button id="tier-quick" class="pill" type="button" role="radio">Veloce</button>
       <button id="tier-deep" class="pill" type="button" role="radio">Più accurata</button>
     </div>
-    <p class="fhelp">"Più accurata" fa ragionare il modello prima di rispondere: meglio con frasi lunghe o audio rumorosi, ma ci mette qualche secondo in più.</p>
+    <p class="fhelp">"Veloce" usa i modelli Flash-Lite: con la chiave gratuita fanno circa 500 traduzioni al giorno ciascuno. "Più accurata" parte dai modelli Flash, che ragionano di più ma ne fanno circa 20 al giorno; quando finiscono, l'app passa da sola ai Flash-Lite.</p>
+  </div>
+
+  <div class="field">
+    <span class="flabel">Consumo di oggi</span>
+    <p id="usage" class="fhelp" role="status"></p>
+    <p class="fhelp">Le "Frasi pronte" non consumano nulla. Una frase scritta uguale a una già tradotta, con le stesse impostazioni, viene ripresa dalla memoria senza consumare, se la sua traduzione non dipende dalla conversazione.</p>
+    <div><button id="forget" class="chip-btn quiet" type="button">Dimentica le frasi già tradotte</button></div>
   </div>
 
   <div class="field">
@@ -428,8 +455,8 @@
     <summary>Avanzate</summary>
     <div class="field">
       <label class="flabel" for="model">Modello Gemini</label>
-      <input id="model" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="gemini-2.5-flash">
-      <p class="fhelp">Lascia vuoto per usare gemini-2.5-flash. Se un giorno non esiste più, l'app passa da sola a gemini-flash-latest.</p>
+      <input id="model" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="automatico">
+      <p class="fhelp">Lascia vuoto e l'app sceglie da sola. Se scrivi un modello, lo prova per primo; se non esiste o ha finito le richieste, passa agli altri.</p>
     </div>
   </details>
 
@@ -441,6 +468,24 @@
       <button id="clear-no" class="chip-btn" type="button">Annulla</button>
     </div>
   </div>
+</section>
+
+<div id="phrases-backdrop" class="backdrop" hidden></div>
+<section id="phrases" class="sheet" role="dialog" aria-modal="true" aria-labelledby="phrases-title" hidden>
+  <div class="sheet-head">
+    <h2 id="phrases-title">Frasi pronte</h2>
+    <button id="close-phrases" class="chip-btn" type="button">Chiudi</button>
+  </div>
+  <p class="fhelp">Frasi già tradotte e scritte nell'app: funzionano anche senza internet e non consumano la chiave. Tocca una frase per aggiungerla alla conversazione.</p>
+  <div class="to-row" role="radiogroup" aria-label="A chi parli">
+    <span>Parli a</span>
+    <button id="ph-to-m" class="pill" type="button" role="radio">un uomo</button>
+    <button id="ph-to-f" class="pill" type="button" role="radio">una donna</button>
+    <button id="ph-to-g" class="pill" type="button" role="radio">più persone</button>
+  </div>
+  <input id="ph-search" class="ph-search" type="search" autocomplete="off" aria-label="Cerca una frase" placeholder="Cerca una frase…">
+  <div id="ph-cats" class="pills" role="group" aria-label="Argomenti"></div>
+  <div id="ph-list" class="ph-list"></div>
 </section>
 
 <div id="big" class="big" role="dialog" aria-modal="true" aria-label="Frase da mostrare" hidden>
@@ -460,9 +505,16 @@
   "use strict";
 
   var STORE_KEY = "tarjman.app.v1";
-  var API = "https://generativelanguage.googleapis.com/v1beta/models/";
-  var DEFAULT_MODEL = "gemini-2.5-flash";
-  var FALLBACK_MODEL = "gemini-flash-latest";
+  var QUOTA_KEY = "tarjman.quota.v1";
+  var CACHE_KEY = "tarjman.cache.v2";
+  var API = "https://generativelanguage.googleapis.com/v1beta/";
+  // The free tier counts requests per model: when one model hits its limit, the next one still answers.
+  // Flash-Lite models allow about 500 requests a day each, full Flash models about 20.
+  // "Salva e prova" replaces these lists with the models the key can really use.
+  var LITE_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"];
+  var FLASH_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+  var REQUEST_TIMEOUT = 60000;
+  var CACHE_MAX = 300;
   var MAX_SECONDS = 60;
   var ARABIC_RE = /[؀-ۿݐ-ݿ]/;
   var TO_LABEL = { m: "a un uomo", f: "a una donna", g: "a più persone" };
@@ -474,6 +526,8 @@
   var LAT_RULES =
     'Rules for every Latin-letter field: vowels read as in Italian; sh = ش, kh = خ, gh = غ, j = ج (as in French "jour"), ' +
     "3 = ع, 7 = ح, 9 = ق; write u, never ou; plain spaces between words; no accents or diacritics.";
+  var STANDALONE_RULE = '"standalone" = true only if this translation would be exactly the same whoever or whatever is being talked about: ' +
+    "it does not depend on the recent conversation or on guessing a gender, a person or a thing the sentence does not name; otherwise false.";
   var SETTING = "You are a live interpreter at a family gathering in Morocco. The user speaks Italian and does not speak Darija. " +
     "The relatives speak Moroccan Darija (everyday urban Darija as spoken around Casablanca), which naturally mixes in French words.";
 
@@ -483,10 +537,11 @@
       heard: { type: "STRING", description: "What the user said, in Italian" },
       ar: { type: "STRING", description: "The Darija translation in Arabic script" },
       lat: { type: "STRING", description: "The same Darija in Latin letters" },
-      note: { type: "STRING", description: "Short note in Italian, or empty" }
+      note: { type: "STRING", description: "Short note in Italian, or empty" },
+      standalone: { type: "BOOLEAN", description: "True if the translation does not depend on the conversation" }
     },
-    required: ["heard", "ar", "lat", "note"],
-    propertyOrdering: ["heard", "ar", "lat", "note"]
+    required: ["heard", "ar", "lat", "note", "standalone"],
+    propertyOrdering: ["heard", "ar", "lat", "note", "standalone"]
   };
   var SCHEMA_DAR2IT = {
     type: "OBJECT",
@@ -504,10 +559,11 @@
           it: { type: "STRING" }
         },
         required: ["ar", "lat", "it"]
-      }
+      },
+      standalone: { type: "BOOLEAN", description: "True if the translation does not depend on the conversation" }
     },
-    required: ["heard", "lat", "it", "note"],
-    propertyOrdering: ["heard", "lat", "it", "note", "reply"]
+    required: ["heard", "lat", "it", "note", "standalone"],
+    propertyOrdering: ["heard", "lat", "it", "note", "reply", "standalone"]
   };
 
   var EXAMPLES = [
@@ -532,11 +588,213 @@
     }
   ];
 
+  // Offline phrasebook. A leaf is [italiano, darija in arabo, darija in lettere latine].
+  // An object splits a phrase: "M"/"F" by the user's gender, "m"/"f"/"g" by who the other side is
+  // (one man, one woman, several people). "r" is the customary reply, "n" a short note.
+  var PHRASE_CATS = [
+    ["saluti", "Saluti"], ["famiglia", "Come stai"], ["tavola", "A tavola"], ["cortesia", "Cortesia"],
+    ["capirsi", "Capirsi"], ["occasioni", "Auguri"], ["io", "Su di me"], ["pratico", "Pratico"], ["diranno", "Ti diranno"]
+  ];
+  var PHRASES = /*PHRASES*/[
+    {"c":"saluti","t":["Ciao!","سلام","salam"]},
+    {"c":"saluti","t":["Salve! (la pace sia con voi)","السلام عليكم","salamu 3likum"],"n":"Il saluto più comune, va bene con tutti. Si risponde: wa 3likum salam."},
+    {"c":"saluti","t":["Buongiorno!","صباح الخير","sba7 lkhir"]},
+    {"c":"saluti","t":["Buonasera!","مسا الخير","msa lkhir"]},
+    {"c":"saluti","t":{"m":["Buonanotte!","تصبح على خير","tesbe7 3la khir"],"f":["Buonanotte!","تصبحي على خير","tesb7i 3la khir"],"g":["Buonanotte a tutti!","تصبحو على خير","tesb7u 3la khir"]}},
+    {"c":"saluti","t":["Piacere!","متشرفين","mtsharfin"],"n":"Lett. 'siamo onorati': si dice quando si conosce qualcuno."},
+    {"c":"saluti","t":{"m":["Che piacere vederti!","فرحت بزاف ملي شفتك","fer7t bzaf mli sheftek"],"f":["Che piacere vederti!","فرحت بزاف ملي شفتك","fer7t bzaf mli sheftek"],"g":["Che piacere vedervi!","فرحت بزاف ملي شفتكم","fer7t bzaf mli sheftkum"]}},
+    {"c":"saluti","t":{"m":["Mi sei mancato tanto!","توحشتك بزاف","twe7shtek bzaf"],"f":["Mi sei mancata tanto!","توحشتك بزاف","twe7shtek bzaf"],"g":["Mi siete mancati tanto!","توحشتكم بزاف","twe7shtkum bzaf"]}},
+    {"c":"saluti","t":{"M":["Eccomi, sono arrivato!","هانا وصلت","hana wselt"],"F":["Eccomi, sono arrivata!","هانا وصلت","hana wselt"]}},
+    {"c":"saluti","t":{"m":["Scusa, ho fatto un po' tardi.","سمح لي، تعطلت شوية","sme7 li, t3ettelt shwiya"],"f":["Scusa, ho fatto un po' tardi.","سمحي لي، تعطلت شوية","sem7i li, t3ettelt shwiya"],"g":["Scusate, ho fatto un po' tardi.","سمحو لي، تعطلت شوية","sem7u li, t3ettelt shwiya"]}},
+    {"c":"saluti","t":{"m":["Hai dormito bene?","نعستي مزيان؟","n3esti mzyan?"],"f":["Hai dormito bene?","نعستي مزيان؟","n3esti mzyan?"],"g":["Avete dormito bene?","نعستو مزيان؟","n3estu mzyan?"]}},
+    {"c":"saluti","t":{"m":["Buona giornata!","نهارك سعيد","nharek sa3id"],"f":["Buona giornata!","نهارك سعيد","nharek sa3id"],"g":["Buona giornata a tutti!","نهاركم سعيد","nharkum sa3id"]}},
+    {"c":"saluti","t":["Arrivederci!","بسلامة","bslama"]},
+    {"c":"saluti","t":{"m":["Alla prossima!","نشوفك على خير","nshufek 3la khir"],"f":["Alla prossima!","نشوفك على خير","nshufek 3la khir"],"g":["Alla prossima!","نشوفكم على خير","nshufkum 3la khir"]}},
+    {"c":"saluti","t":{"m":["Ci vediamo domani!","نشوفك غدا","nshufek ghedda"],"f":["Ci vediamo domani!","نشوفك غدا","nshufek ghedda"],"g":["Ci vediamo domani!","نشوفكم غدا","nshufkum ghedda"]}},
+    {"c":"saluti","t":{"m":["Salutali da parte mia!","سلم لي عليهم","sellem li 3lihum"],"f":["Salutali da parte mia!","سلمي لي عليهم","sellmi li 3lihum"],"g":["Salutateli da parte mia!","سلمو لي عليهم","sellmu li 3lihum"]}},
+    {"c":"saluti","t":{"M":["Vado a dormire.","غادي نعس","ghadi n3es"],"F":["Vado a dormire.","غادية نعس","ghadya n3es"]}},
+    {"c":"saluti","t":["Grazie, è stata una giornata bellissima!","شكرا، كان نهار زوين بزاف","shukran, kan nhar zwin bzaf"]},
+    {"c":"famiglia","t":{"m":["Come stai?","كيداير؟","kidayr?"],"f":["Come stai?","كيدايرة؟","kidayra?"],"g":["Come state?","كيدايرين؟","kidayrin?"]}},
+    {"c":"famiglia","t":["Tutto bene?","لاباس؟","labas?"]},
+    {"c":"famiglia","t":["Sto bene, grazie a Dio.","أنا بخير، الحمد لله","ana bikhir, l7amdulillah"]},
+    {"c":"famiglia","t":{"m":["Bene, grazie a Dio. E tu?","لاباس، الحمد لله. ونتا؟","labas, l7amdulillah. u nta?"],"f":["Bene, grazie a Dio. E tu?","لاباس، الحمد لله. ونتي؟","labas, l7amdulillah. u nti?"],"g":["Bene, grazie a Dio. E voi?","لاباس، الحمد لله. ونتوما؟","labas, l7amdulillah. u ntuma?"]}},
+    {"c":"famiglia","t":["Tutti bene, grazie a Dio.","كلشي لاباس، الحمد لله","kulshi labas, l7amdulillah"]},
+    {"c":"famiglia","t":["Come sta la famiglia?","كيدايرة العايلة؟","kidayra l3ayla?"]},
+    {"c":"famiglia","t":["Come sta la mamma?","كيدايرة الوالدة؟","kidayra lwalida?"]},
+    {"c":"famiglia","t":["Come sta il papà?","كيداير الوالد؟","kidayr lwalid?"]},
+    {"c":"famiglia","t":["Come stanno i bambini?","كيدايرين الدراري؟","kidayrin ddrari?"]},
+    {"c":"famiglia","t":{"m":["Adesso stai meglio?","لاباس عليك دابا؟","labas 3lik daba?"],"f":["Adesso stai meglio?","لاباس عليك دابا؟","labas 3lik daba?"],"g":["Adesso state meglio?","لاباس عليكم دابا؟","labas 3likum daba?"]}},
+    {"c":"famiglia","t":["Come ti chiami?","شنو سميتك؟","shnu smitek?"]},
+    {"c":"famiglia","t":["Chi è lui?","شكون هادا؟","shkun hada?"]},
+    {"c":"famiglia","t":["Chi è lei?","شكون هادي؟","shkun hadi?"]},
+    {"c":"famiglia","t":{"m":["Sei sposato?","واش نتا مزوج؟","wash nta mzuwwej?"],"f":["Sei sposata?","واش نتي مزوجة؟","wash nti mzuwwja?"],"g":["Siete sposati?","واش نتوما مزوجين؟","wash ntuma mzuwwjin?"]}},
+    {"c":"famiglia","t":{"m":["Hai figli?","واش عندك الولاد؟","wash 3endek lwlad?"],"f":["Hai figli?","واش عندك الولاد؟","wash 3endek lwlad?"],"g":["Avete figli?","واش عندكم الولاد؟","wash 3endkum lwlad?"]}},
+    {"c":"famiglia","t":{"m":["Che lavoro fai?","فاش كتخدم؟","fash katkhdem?"],"f":["Che lavoro fai?","فاش كتخدمي؟","fash katkhedmi?"],"g":["Che lavoro fate?","فاش كتخدمو؟","fash katkhedmu?"]}},
+    {"c":"famiglia","t":{"m":["Dove abiti?","فين ساكن؟","fin saken?"],"f":["Dove abiti?","فين ساكنة؟","fin sakna?"],"g":["Dove abitate?","فين ساكنين؟","fin saknin?"]}},
+    {"c":"famiglia","t":["Che bel bambino, Dio lo benedica!","تبارك الله عليه! زوين بزاف","tbarkallah 3lih! zwin bzaf"],"n":"Nei complimenti si dice sempre tbarkallah: protegge dal malocchio."},
+    {"c":"famiglia","t":["Che bella bambina, Dio la benedica!","تبارك الله عليها! زوينة بزاف","tbarkallah 3liha! zwina bzaf"]},
+    {"c":"famiglia","t":["Questa è mia moglie.","هادي مراتي","hadi mrati"]},
+    {"c":"famiglia","t":["Questo è mio marito.","هادا راجلي","hada rajli"]},
+    {"c":"famiglia","t":{"m":["La mia famiglia ti saluta tanto.","العايلة ديالي كتسلم عليك بزاف","l3ayla dyali katsellem 3lik bzaf"],"f":["La mia famiglia ti saluta tanto.","العايلة ديالي كتسلم عليك بزاف","l3ayla dyali katsellem 3lik bzaf"],"g":["La mia famiglia vi saluta tanto.","العايلة ديالي كتسلم عليكم بزاف","l3ayla dyali katsellem 3likum bzaf"]}},
+    {"c":"tavola","t":["Nel nome di Dio!","بسم الله","bismillah"],"n":"Si dice prima di cominciare a mangiare o a bere."},
+    {"c":"tavola","t":["È buonissimo!","بنين بزاف!","bnin bzaf!"]},
+    {"c":"tavola","t":{"m":["Complimenti, cucini benissimo!","تبارك الله عليك، كتطيب مزيان بزاف","tbarkallah 3lik, kattiyyeb mzyan bzaf"],"f":["Complimenti, cucini benissimo!","تبارك الله عليك، كتطيبي مزيان بزاف","tbarkallah 3lik, kattiybi mzyan bzaf"],"g":["Complimenti, cucinate benissimo!","تبارك الله عليكم، كتطيبو مزيان بزاف","tbarkallah 3likum, kattiybu mzyan bzaf"]}},
+    {"c":"tavola","t":["Chi ha cucinato?","شكون اللي طيب؟","shkun lli tiyyeb?"]},
+    {"c":"tavola","t":["Basta così, grazie.","صافي، شكرا","safi, shukran"]},
+    {"c":"tavola","t":{"M":["Sono sazio, grazie a Dio.","شبعت، الحمد لله","shbe3t, l7amdulillah"],"F":["Sono sazia, grazie a Dio.","شبعت، الحمد لله","shbe3t, l7amdulillah"]}},
+    {"c":"tavola","t":["Grazie mille, ma non ce la faccio più.","شكرا بزاف، ولكن ما بقيتش نقدر","shukran bzaf, walakin ma b9itsh n9der"]},
+    {"c":"tavola","t":{"m":["Solo un pochino, per favore.","غير شوية، عافاك","gher shwiya, 3afak"],"f":["Solo un pochino, per favore.","غير شوية، عافاك","gher shwiya, 3afak"],"g":["Solo un pochino, per favore.","غير شوية، عافاكم","gher shwiya, 3afakum"]}},
+    {"c":"tavola","t":{"m":["Mi dai un po' d'acqua, per favore?","عطيني شوية د الما، عافاك","3tini shwiya d lma, 3afak"],"f":["Mi dai un po' d'acqua, per favore?","عطيني شوية د الما، عافاك","3tini shwiya d lma, 3afak"],"g":["Mi date un po' d'acqua, per favore?","عطيوني شوية د الما، عافاكم","3tiwni shwiya d lma, 3afakum"]}},
+    {"c":"tavola","t":{"m":["Mi passi il pane, per favore?","عطيني الخبز، عافاك","3tini lkhobz, 3afak"],"f":["Mi passi il pane, per favore?","عطيني الخبز، عافاك","3tini lkhobz, 3afak"],"g":["Mi passate il pane, per favore?","عطيوني الخبز، عافاكم","3tiwni lkhobz, 3afakum"]}},
+    {"c":"tavola","t":{"m":["Ancora un po' di tè, per favore.","زيد لي شوية د أتاي، عافاك","zid li shwiya d atay, 3afak"],"f":["Ancora un po' di tè, per favore.","زيدي لي شوية د أتاي، عافاك","zidi li shwiya d atay, 3afak"],"g":["Ancora un po' di tè, per favore.","زيدو لي شوية د أتاي، عافاكم","zidu li shwiya d atay, 3afakum"]}},
+    {"c":"tavola","t":["Il tè è buonissimo!","أتاي بنين بزاف!","atay bnin bzaf!"]},
+    {"c":"tavola","t":["No, grazie.","لا، شكرا","la, shukran"]},
+    {"c":"tavola","t":["Come si chiama questo piatto?","شنو سمية هاد الماكلة؟","shnu smiyt had lmakla?"]},
+    {"c":"tavola","t":["È piccante?","واش حار؟","wash 7arr?"]},
+    {"c":"tavola","t":{"M":["Sono a dieta.","أنا داير ريجيم","ana dayr rijim"],"F":["Sono a dieta.","أنا دايرة ريجيم","ana dayra rijim"]}},
+    {"c":"tavola","t":["Ho mangiato tantissimo!","كليت بزاف!","klit bzaf!"]},
+    {"c":"tavola","t":["Era tutto buonissimo, grazie!","كلشي كان بنين، شكرا","kulshi kan bnin, shukran"]},
+    {"c":"tavola","t":["Grazie per il pasto!","الله يخلف","Allah ykhlef"],"n":"Ringraziamento tipico a fine pasto, a chi ha offerto da mangiare (lett. 'che Dio ve lo renda')."},
+    {"c":"tavola","t":["Alla salute! (buon appetito)","بالصحة","bessa7a"],"n":"Si dice a chi mangia o beve. Risposta: Allah y3tik sa7a."},
+    {"c":"tavola","t":["Mi piace tantissimo il cuscus.","كيعجبني الكسكسو بزاف","kay3jebni lkesksu bzaf"]},
+    {"c":"cortesia","t":["Grazie!","شكرا","shukran"]},
+    {"c":"cortesia","t":["Grazie mille!","شكرا بزاف","shukran bzaf"]},
+    {"c":"cortesia","t":["Grazie di tutto!","شكرا على كلشي","shukran 3la kulshi"]},
+    {"c":"cortesia","t":{"m":["Ti ringrazio tanto.","كنشكرك بزاف","kanshekrek bzaf"],"f":["Ti ringrazio tanto.","كنشكرك بزاف","kanshekrek bzaf"],"g":["Vi ringrazio tanto.","كنشكركم بزاف","kanshkerkum bzaf"]}},
+    {"c":"cortesia","t":{"m":["Grazie, Dio ti benedica!","الله يبارك فيك","Allah ybarek fik"],"f":["Grazie, Dio ti benedica!","الله يبارك فيك","Allah ybarek fik"],"g":["Grazie, Dio vi benedica!","الله يبارك فيكم","Allah ybarek fikum"]}},
+    {"c":"cortesia","t":{"m":["Che Dio ti ricompensi!","الله يجازيك بخير","Allah yjazik bikhir"],"f":["Che Dio ti ricompensi!","الله يجازيك بخير","Allah yjazik bikhir"],"g":["Che Dio vi ricompensi!","الله يجازيكم بخير","Allah yjazikum bikhir"]}},
+    {"c":"cortesia","t":{"m":["Che Dio ti protegga!","الله يحفظك","Allah y7fedek"],"f":["Che Dio ti protegga!","الله يحفظك","Allah y7fedek"],"g":["Che Dio vi protegga!","الله يحفظكم","Allah y7fedkum"]}},
+    {"c":"cortesia","t":{"m":["Per favore.","عافاك","3afak"],"f":["Per favore.","عافاك","3afak"],"g":["Per favore.","عافاكم","3afakum"]}},
+    {"c":"cortesia","t":{"m":["Ti prego!","الله يخليك","Allah ykhellik"],"f":["Ti prego!","الله يخليك","Allah ykhellik"],"g":["Vi prego!","الله يخليكم","Allah ykhellikum"]},"n":"Richiesta calorosa (lett. 'che Dio ti conservi'); si usa anche per ringraziare."},
+    {"c":"cortesia","t":["Non c'è di che!","لا شكرا على واجب","la shukran 3la wajib"]},
+    {"c":"cortesia","t":["Nessun problema.","ماشي مشكل","mashi mushkil"]},
+    {"c":"cortesia","t":["Non fa niente.","ماعليش","ma3lish"]},
+    {"c":"cortesia","t":["Con piacere!","مرحبا","merhba"],"n":"Si dice anche per 'prego, accomodati'."},
+    {"c":"cortesia","t":{"m":["Scusa!","سمح لي","sme7 li"],"f":["Scusa!","سمحي لي","sem7i li"],"g":["Scusate!","سمحو لي","sem7u li"]}},
+    {"c":"cortesia","t":{"m":["Scusa il disturbo.","سمح لي على الصداع","sme7 li 3la ssda3"],"f":["Scusa il disturbo.","سمحي لي على الصداع","sem7i li 3la ssda3"],"g":["Scusate il disturbo.","سمحو لي على الصداع","sem7u li 3la ssda3"]}},
+    {"c":"cortesia","t":{"m":["Scusa, non volevo.","سمح لي، ما كنتش كنقصد","sme7 li, ma kuntsh kan9sed"],"f":["Scusa, non volevo.","سمحي لي، ما كنتش كنقصد","sem7i li, ma kuntsh kan9sed"],"g":["Scusate, non volevo.","سمحو لي، ما كنتش كنقصد","sem7u li, ma kuntsh kan9sed"]}},
+    {"c":"cortesia","t":{"m":["Non dovevi disturbarti!","ما كانش لاش!","ma kansh lash!"],"f":["Non dovevi disturbarti!","ما كانش لاش!","ma kansh lash!"],"g":["Non dovevate disturbarvi!","ما كانش لاش!","ma kansh lash!"]},"n":"Si dice ricevendo un regalo o un gesto gentile."},
+    {"c":"cortesia","t":{"m":["Questo è un piccolo regalo per te.","هادي هدية صغيرة ليك","hadi hdiya sghira lik"],"f":["Questo è un piccolo regalo per te.","هادي هدية صغيرة ليك","hadi hdiya sghira lik"],"g":["Questo è un piccolo regalo per voi.","هادي هدية صغيرة ليكم","hadi hdiya sghira likum"]}},
+    {"c":"cortesia","t":{"m":["Mi hai fatto tanto felice!","فرحتيني بزاف","fer7tini bzaf"],"f":["Mi hai fatto tanto felice!","فرحتيني بزاف","fer7tini bzaf"],"g":["Mi avete fatto tanto felice!","فرحتوني بزاف","fer7tuni bzaf"]}},
+    {"c":"capirsi","t":["Non ho capito.","ما فهمتش","ma fhemtsh"]},
+    {"c":"capirsi","t":["Ho capito.","فهمت","fhemt"]},
+    {"c":"capirsi","t":{"m":["Hai capito?","فهمتي؟","fhemti?"],"f":["Hai capito?","فهمتي؟","fhemti?"],"g":["Avete capito?","فهمتو؟","fhemtu?"]}},
+    {"c":"capirsi","t":{"m":["Mi capisci?","كتفهمني؟","katfhemni?"],"f":["Mi capisci?","كتفهميني؟","katfhemini?"],"g":["Mi capite?","كتفهموني؟","katfhemuni?"]}},
+    {"c":"capirsi","t":["Non parlo darija.","ما كنهضرش الدارجة","ma kanhdersh ddarija"]},
+    {"c":"capirsi","t":["Parlo solo un pochino di darija.","كنهضر غير شوية د الدارجة","kanhder gher shwiya d ddarija"]},
+    {"c":"capirsi","t":{"m":["Parla piano, per favore.","هضر بشوية، عافاك","hder b shwiya, 3afak"],"f":["Parla piano, per favore.","هضري بشوية، عافاك","hedri b shwiya, 3afak"],"g":["Parlate piano, per favore.","هضرو بشوية، عافاكم","hedru b shwiya, 3afakum"]}},
+    {"c":"capirsi","t":{"m":["Ripeti, per favore.","عاود، عافاك","3awed, 3afak"],"f":["Ripeti, per favore.","عاودي، عافاك","3awdi, 3afak"],"g":["Ripetete, per favore.","عاودو، عافاكم","3awdu, 3afakum"]}},
+    {"c":"capirsi","t":{"m":["Cosa vuoi dire?","آش بغيتي تقول؟","ash bghiti tgul?"],"f":["Cosa vuoi dire?","آش بغيتي تقولي؟","ash bghiti tguli?"],"g":["Cosa volete dire?","آش بغيتو تقولو؟","ash bghitu tgulu?"]}},
+    {"c":"capirsi","t":["Cosa significa questa parola?","شنو كتعني هاد الكلمة؟","shnu kat3ni had lkelma?"]},
+    {"c":"capirsi","t":["Come si dice questo in darija?","كيفاش كنقولو هادي بالدارجة؟","kifash kangulu hadi b ddarija?"]},
+    {"c":"capirsi","t":["Cos'è questo?","شنو هادا؟","shnu hada?"]},
+    {"c":"capirsi","t":{"m":["Te lo scrivo subito.","دابا نكتبها ليك","daba nketbha lik"],"f":["Te lo scrivo subito.","دابا نكتبها ليك","daba nketbha lik"],"g":["Ve lo scrivo subito.","دابا نكتبها ليكم","daba nketbha likum"]}},
+    {"c":"capirsi","t":{"m":["Me lo scrivi, per favore?","كتبها لي، عافاك","ktebha li, 3afak"],"f":["Me lo scrivi, per favore?","كتبيها لي، عافاك","ketbiha li, 3afak"],"g":["Me lo scrivete, per favore?","كتبوها لي، عافاكم","ketbuha li, 3afakum"]}},
+    {"c":"capirsi","t":{"m":["Parli italiano?","واش كتهضر الطليانية؟","wash kathder ttalyaniya?"],"f":["Parli italiano?","واش كتهضري الطليانية؟","wash kathedri ttalyaniya?"],"g":["Parlate italiano?","واش كتهضرو الطليانية؟","wash kathedru ttalyaniya?"]}},
+    {"c":"capirsi","t":{"m":["Parli francese?","واش كتهضر الفرنساوية؟","wash kathder lfransawiya?"],"f":["Parli francese?","واش كتهضري الفرنساوية؟","wash kathedri lfransawiya?"],"g":["Parlate francese?","واش كتهضرو الفرنساوية؟","wash kathedru lfransawiya?"]}},
+    {"c":"capirsi","t":["Un pochino.","شوية","shwiya"]},
+    {"c":"capirsi","t":["Non lo so.","ما نعرفش","ma n3refsh"]},
+    {"c":"capirsi","t":["Uso il telefono per tradurre.","كنستعمل التيليفون باش نترجم","kansta3mel ttilifun bash ntarjem"]},
+    {"c":"capirsi","t":{"m":["Parla qui, nel telefono, per favore.","هضر هنا فالتيليفون، عافاك","hder hna f ttilifun, 3afak"],"f":["Parla qui, nel telefono, per favore.","هضري هنا فالتيليفون، عافاك","hedri hna f ttilifun, 3afak"],"g":["Parlate qui, nel telefono, per favore.","هضرو هنا فالتيليفون، عافاكم","hedru hna f ttilifun, 3afakum"]}},
+    {"c":"capirsi","t":{"m":["Insegnami una parola in darija!","علمني شي كلمة بالدارجة","3allemni shi kelma b ddarija"],"f":["Insegnami una parola in darija!","علميني شي كلمة بالدارجة","3allmini shi kelma b ddarija"],"g":["Insegnatemi una parola in darija!","علموني شي كلمة بالدارجة","3allmuni shi kelma b ddarija"]}},
+    {"c":"capirsi","t":["Cosa ha detto lui?","آش قال؟","ash gal?"]},
+    {"c":"capirsi","t":["Cosa ha detto lei?","آش قالت؟","ash galt?"]},
+    {"c":"occasioni","t":["Congratulazioni!","مبروك!","mbruk!"],"n":"Si risponde: Allah ybarek fik."},
+    {"c":"occasioni","t":{"m":["Congratulazioni! Che tutto vada per il meglio.","مبروك عليك، الله يكمل بالخير","mbruk 3lik, Allah ykemmel b lkhir"],"f":["Congratulazioni! Che tutto vada per il meglio.","مبروك عليك، الله يكمل بالخير","mbruk 3lik, Allah ykemmel b lkhir"],"g":["Congratulazioni! Che tutto vada per il meglio.","مبروك عليكم، الله يكمل بالخير","mbruk 3likum, Allah ykemmel b lkhir"]},"n":"Augurio per fidanzamento e matrimonio."},
+    {"c":"occasioni","t":["Che bella la sposa, Dio la benedica!","تبارك الله على العروسة، زوينة بزاف","tbarkallah 3la l3rusa, zwina bzaf"]},
+    {"c":"occasioni","t":["Che bello lo sposo, Dio lo benedica!","تبارك الله على العريس، زوين بزاف","tbarkallah 3la l3ris, zwin bzaf"]},
+    {"c":"occasioni","t":["Congratulazioni per il neonato!","مبروك المزيود!","mbruk lmzyud!"],"n":"Per una nascita. Per una bambina: mbruk lmzyuda."},
+    {"c":"occasioni","t":{"m":["Che Dio te lo conservi!","الله يخليه ليك","Allah ykhellih lik"],"f":["Che Dio te lo conservi!","الله يخليه ليك","Allah ykhellih lik"],"g":["Che Dio ve lo conservi!","الله يخليه ليكم","Allah ykhellih likum"]},"n":"Detto di un figlio o di un neonato. Per una bambina: Allah ykhelliha lik."},
+    {"c":"occasioni","t":["Buon Eid!","مبروك العيد!","mbruk l3id!"]},
+    {"c":"occasioni","t":["Buona festa!","عواشر مبروكة","3washer mbruka"],"n":"Augurio per le feste religiose (Eid, Ramadan)."},
+    {"c":"occasioni","t":{"m":["Buon Ramadan!","مبروك عليك رمضان","mbruk 3lik remdan"],"f":["Buon Ramadan!","مبروك عليك رمضان","mbruk 3lik remdan"],"g":["Buon Ramadan!","مبروك عليكم رمضان","mbruk 3likum remdan"]}},
+    {"c":"occasioni","t":{"m":["Stai facendo il digiuno?","واش نتا صايم؟","wash nta sayem?"],"f":["Stai facendo il digiuno?","واش نتي صايمة؟","wash nti sayma?"],"g":["State facendo il digiuno?","واش نتوما صايمين؟","wash ntuma saymin?"]}},
+    {"c":"occasioni","t":{"M":["Io non sto facendo il digiuno.","أنا ماشي صايم","ana mashi sayem"],"F":["Io non sto facendo il digiuno.","أنا ماشي صايمة","ana mashi sayma"]}},
+    {"c":"occasioni","t":["A che ora si rompe il digiuno?","فوقاش الفطور؟","fu9ash lftur?"]},
+    {"c":"occasioni","t":["Che Dio lo accetti!","الله يتقبل","Allah yt9ebbel"],"n":"Si dice a chi ha appena finito di pregare."},
+    {"c":"occasioni","t":{"m":["Condoglianze.","البركة فراسك","lbaraka f rasek"],"f":["Condoglianze.","البركة فراسك","lbaraka f rasek"],"g":["Condoglianze.","البركة فراسكم","lbaraka f raskum"]},"n":"Formula di condoglianze ai familiari del defunto."},
+    {"c":"occasioni","t":["Che Dio abbia misericordia di lui.","الله يرحمو","Allah yr7mu"],"n":"Si dice nominando un defunto."},
+    {"c":"occasioni","t":["Che Dio abbia misericordia di lei.","الله يرحمها","Allah yr7mha"],"n":"Si dice nominando una defunta."},
+    {"c":"occasioni","t":{"m":["Guarisci presto!","الله يشافيك","Allah yshafik"],"f":["Guarisci presto!","الله يشافيك","Allah yshafik"],"g":["Guarite presto!","الله يشافيكم","Allah yshafikum"]}},
+    {"c":"occasioni","t":["Buon viaggio!","طريق السلامة","tri9 sslama"]},
+    {"c":"occasioni","t":{"m":["Buona fortuna!","الله يوفقك","Allah ywef9ek"],"f":["Buona fortuna!","الله يوفقك","Allah ywef9ek"],"g":["Buona fortuna!","الله يوفقكم","Allah ywef9kum"]}},
+    {"c":"io","t":{"M":["Sono italiano.","أنا طلياني","ana talyani"],"F":["Sono italiana.","أنا طليانية","ana talyaniya"]}},
+    {"c":"io","t":["Mi chiamo ...","سميتي ...","smiti ..."]},
+    {"c":"io","t":{"M":["Vivo in Italia.","أنا ساكن فإيطاليا","ana saken f italya"],"F":["Vivo in Italia.","أنا ساكنة فإيطاليا","ana sakna f italya"]}},
+    {"c":"io","t":["È la prima volta che vengo in Marocco.","هادي أول مرة نجي للمغرب","hadi awwel merra nji llmeghrib"]},
+    {"c":"io","t":{"M":["Sono sposato.","أنا مزوج","ana mzuwwej"],"F":["Sono sposata.","أنا مزوجة","ana mzuwwja"]}},
+    {"c":"io","t":["Ho due figli.","عندي جوج د الولاد","3endi juj d lwlad"]},
+    {"c":"io","t":["Mia moglie è marocchina.","مراتي مغربية","mrati meghribiya"]},
+    {"c":"io","t":["Mio marito è marocchino.","راجلي مغربي","rajli meghribi"]},
+    {"c":"io","t":{"M":["Sono stanco.","أنا عيان","ana 3yan"],"F":["Sono stanca.","أنا عيانة","ana 3yana"]}},
+    {"c":"io","t":{"M":["Sono un po' stanco per il viaggio.","عيان شوية من السفر","3yan shwiya mn ssfer"],"F":["Sono un po' stanca per il viaggio.","عيانة شوية من السفر","3yana shwiya mn ssfer"]}},
+    {"c":"io","t":["Vorrei riposarmi un po'.","بغيت نرتاح شوية","bghit nrta7 shwiya"]},
+    {"c":"io","t":["Ho dormito benissimo.","نعست مزيان بزاف","n3est mzyan bzaf"]},
+    {"c":"io","t":{"M":["Sono felicissimo di essere qui con voi.","فرحان بزاف حيت أنا هنا معاكم","fer7an bzaf 7it ana hna m3akum"],"F":["Sono felicissima di essere qui con voi.","فرحانة بزاف حيت أنا هنا معاكم","fer7ana bzaf 7it ana hna m3akum"]}},
+    {"c":"io","t":["Vi voglio tanto bene!","كنبغيكم بزاف","kanbghikum bzaf"]},
+    {"c":"io","t":["Qui mi sento a casa.","هنا كنحس براسي فداري","hna kan7ess b rasi f dari"]},
+    {"c":"io","t":["Mi piace tantissimo il Marocco.","كيعجبني المغرب بزاف","kay3jebni lmeghrib bzaf"]},
+    {"c":"io","t":["Il Marocco è bellissimo.","المغرب زوين بزاف","lmeghrib zwin bzaf"]},
+    {"c":"io","t":["Mi piace tantissimo la cucina marocchina.","كتعجبني الماكلة المغربية بزاف","kat3jebni lmakla lmeghribiya bzaf"]},
+    {"c":"io","t":["Ho freddo.","فيا البرد","fiya lberd"]},
+    {"c":"io","t":["Mi fa male la testa.","كيضرني راسي","kayderni rasi"]},
+    {"c":"io","t":["Non mi sento bene.","ما كنحسش براسي مزيان","ma kan7essh b rasi mzyan"]},
+    {"c":"pratico","t":["Dov'è il bagno?","فين كاين بيت الما؟","fin kayn bit lma?"]},
+    {"c":"pratico","t":["Posso fare una foto?","واش نقدر ناخد تصويرة؟","wash n9der nakhod tswira?"]},
+    {"c":"pratico","t":["Facciamo una foto tutti insieme!","يالاه ناخدو تصويرة كاملين!","yallah nakhdu tswira kamlin!"]},
+    {"c":"pratico","t":["Posso sedermi qui?","واش نقدر نكلس هنا؟","wash n9der ngles hna?"]},
+    {"c":"pratico","t":["Posso caricare il telefono?","واش نقدر نشارجي التيليفون؟","wash n9der nsharji ttilifun?"]},
+    {"c":"pratico","t":["Qual è la password del wifi?","شنو هو الكود ديال الويفي؟","shnu huwa lkod dyal lwifi?"]},
+    {"c":"pratico","t":{"m":["Posso aiutarti?","واش نعاونك؟","wash n3awnek?"],"f":["Posso aiutarti?","واش نعاونك؟","wash n3awnek?"],"g":["Posso aiutarvi?","واش نعاونكم؟","wash n3awnkum?"]}},
+    {"c":"pratico","t":{"m":["Aspetta un momento.","تسنى شوية","tsenna shwiya"],"f":["Aspetta un momento.","تسناي شوية","tsennay shwiya"],"g":["Aspettate un momento.","تسناو شوية","tsennaw shwiya"]}},
+    {"c":"pratico","t":["Adesso devo andare.","خصني نمشي دابا","khessni nmshi daba"]},
+    {"c":"pratico","t":["Andiamo!","يالاه!","yallah!"]},
+    {"c":"pratico","t":["Che ore sono?","شحال فالساعة؟","sh7al f ssa3a?"]},
+    {"c":"pratico","t":["A che ora?","فوقاش؟","fu9ash?"]},
+    {"c":"pratico","t":["Sì.","إيه","iyeh"]},
+    {"c":"pratico","t":["No.","لا","la"]},
+    {"c":"pratico","t":["Va bene, d'accordo.","واخا","wakha"]},
+    {"c":"pratico","t":["Fa molto caldo.","الحال سخون بزاف","l7al skhun bzaf"]},
+    {"c":"diranno","t":["Salve! (la pace sia con te)","السلام عليكم","salamu 3likum"],"r":{"m":["E la pace sia anche con te!","وعليكم السلام","wa 3likum salam"],"f":["E la pace sia anche con te!","وعليكم السلام","wa 3likum salam"],"g":["E la pace sia anche con voi!","وعليكم السلام","wa 3likum salam"]}},
+    {"c":"diranno","t":["Buongiorno!","صباح الخير","sba7 lkhir"],"r":{"m":["Buongiorno a te! (lett. mattino di luce)","صباح النور","sba7 nnur"],"f":["Buongiorno a te! (lett. mattino di luce)","صباح النور","sba7 nnur"],"g":["Buongiorno a voi! (lett. mattino di luce)","صباح النور","sba7 nnur"]}},
+    {"c":"diranno","t":{"M":["Benvenuto!","مرحبا بيك","merhba bik"],"F":["Benvenuta!","مرحبا بيك","merhba bik"]},"r":{"m":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"f":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"g":["Grazie, Dio vi benedica.","الله يبارك فيكم","Allah ybarek fikum"]}},
+    {"c":"diranno","t":{"M":["Grazie a Dio sei arrivato sano e salvo!","الحمد لله على السلامة","l7amdulillah 3la slama"],"F":["Grazie a Dio sei arrivata sana e salva!","الحمد لله على السلامة","l7amdulillah 3la slama"]},"n":"Si dice a chi arriva da un viaggio.","r":{"m":["Dio ti protegga.","الله يسلمك","Allah ysellmek"],"f":["Dio ti protegga.","الله يسلمك","Allah ysellmek"],"g":["Dio vi protegga.","الله يسلمكم","Allah ysellemkum"]}},
+    {"c":"diranno","t":{"M":["Come stai?","كيداير؟","kidayr?"],"F":["Come stai?","كيدايرة؟","kidayra?"]},"r":{"m":["Bene, grazie a Dio. E tu?","لاباس، الحمد لله. ونتا؟","labas, l7amdulillah. u nta?"],"f":["Bene, grazie a Dio. E tu?","لاباس، الحمد لله. ونتي؟","labas, l7amdulillah. u nti?"],"g":["Bene, grazie a Dio. E voi?","لاباس، الحمد لله. ونتوما؟","labas, l7amdulillah. u ntuma?"]}},
+    {"c":"diranno","t":["Tutto bene?","لاباس؟","labas?"],"r":["Tutto bene, grazie a Dio.","لاباس، الحمد لله","labas, l7amdulillah"]},
+    {"c":"diranno","t":["Piacere (di conoscerti)!","متشرفين","mtsharfin"],"r":["Piacere mio!","متشرفين","mtsharfin"],"n":"Si risponde ripetendo la stessa parola."},
+    {"c":"diranno","t":{"M":["Di dove sei?","منين نتا؟","mnin nta?"],"F":["Di dove sei?","منين نتي؟","mnin nti?"]},"r":{"M":["Sono italiano.","أنا طلياني","ana talyani"],"F":["Sono italiana.","أنا طليانية","ana talyaniya"]}},
+    {"c":"diranno","t":{"M":["Parli darija?","واش كتهضر الدارجة؟","wash kathder ddarija?"],"F":["Parli darija?","واش كتهضري الدارجة؟","wash kathedri ddarija?"]},"r":["Solo un pochino.","غير شوية","gher shwiya"]},
+    {"c":"diranno","t":["Ti piace il Marocco?","عجبك المغرب؟","3jebek lmeghrib?"],"r":["Sì, tantissimo!","إيه، بزاف!","iyeh, bzaf!"]},
+    {"c":"diranno","t":{"M":["Prego, accomodati! / Serviti!","تفضل","tfeddel"],"F":["Prego, accomodati! / Serviti!","تفضلي","tfeddli"]},"n":"Si dice offrendo qualcosa o invitando a entrare o a sedersi.","r":["Grazie.","شكرا","shukran"]},
+    {"c":"diranno","t":["Fai come se fossi a casa tua!","الدار دارك","ddar dark"],"r":["Grazie mille.","شكرا بزاف","shukran bzaf"]},
+    {"c":"diranno","t":{"M":["Mangia!","كول!","kul!"],"F":["Mangia!","كولي!","kuli!"]},"n":"Insistere col cibo è un gesto d'affetto."},
+    {"c":"diranno","t":{"M":["Mangia ancora!","زيد كول!","zid kul!"],"F":["Mangia ancora!","زيدي كولي!","zidi kuli!"]},"r":{"M":["Sono sazio, grazie a Dio.","شبعت، الحمد لله","shbe3t, l7amdulillah"],"F":["Sono sazia, grazie a Dio.","شبعت، الحمد لله","shbe3t, l7amdulillah"]}},
+    {"c":"diranno","t":{"M":["Perché non mangi?","علاش ما كتاكلش؟","3lash ma katakulsh?"],"F":["Perché non mangi?","علاش ما كتاكليش؟","3lash ma kataklish?"]},"r":["Ho mangiato tantissimo, grazie a Dio!","كليت بزاف، الحمد لله","klit bzaf, l7amdulillah"]},
+    {"c":"diranno","t":["Alla salute! / Buon appetito!","بالصحة","bessa7a"],"n":"Si dice a chi mangia, beve o ha qualcosa di nuovo.","r":{"m":["Dio ti dia salute.","الله يعطيك الصحة","Allah y3tik sa7a"],"f":["Dio ti dia salute.","الله يعطيك الصحة","Allah y3tik sa7a"],"g":["Dio vi dia salute.","الله يعطيكم الصحة","Allah y3tikum sa7a"]}},
+    {"c":"diranno","t":["Complimenti, Dio ti benedica!","تبارك الله عليك","tbarkallah 3lik"],"n":"Complimento che allontana il malocchio.","r":{"m":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"f":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"g":["Grazie, Dio vi benedica.","الله يبارك فيكم","Allah ybarek fikum"]}},
+    {"c":"diranno","t":{"M":["Sei stanco?","عييتي؟","3yiti?"],"F":["Sei stanca?","عييتي؟","3yiti?"]},"r":["Un pochino.","شوية","shwiya"]},
+    {"c":"diranno","t":{"M":["Tranquillo, va tutto bene.","هانية","hanya"],"F":["Tranquilla, va tutto bene.","هانية","hanya"]}},
+    {"c":"diranno","t":{"M":["Attento!","بالاك!","balak!"],"F":["Attenta!","بالاك!","balak!"]}},
+    {"c":"diranno","t":["Grazie a Dio.","الحمد لله","l7amdulillah"],"n":"Si dice di continuo: per dire che va tutto bene, o dopo aver mangiato."},
+    {"c":"diranno","t":["Se Dio vuole.","إن شاء الله","inshallah"],"n":"Si usa per ogni cosa futura; a volte vuol dire solo 'forse'."},
+    {"c":"diranno","t":["Basta così. / Ok, fatto.","صافي","safi"],"n":"Vuol dire 'basta', 'ok' o 'finito', a seconda del tono."},
+    {"c":"diranno","t":["Va bene, d'accordo.","واخا","wakha"]},
+    {"c":"diranno","t":["Congratulazioni!","مبروك!","mbruk!"],"r":{"m":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"f":["Grazie, Dio ti benedica.","الله يبارك فيك","Allah ybarek fik"],"g":["Grazie, Dio vi benedica.","الله يبارك فيكم","Allah ybarek fikum"]}},
+    {"c":"diranno","t":["Buona festa!","عواشر مبروكة","3washer mbruka"],"n":"Augurio per le feste religiose (Eid, Ramadan).","r":{"m":["Anche a te! (lett. a noi e a te)","علينا وعليك","3lina u 3lik"],"f":["Anche a te! (lett. a noi e a te)","علينا وعليك","3lina u 3lik"],"g":["Anche a voi! (lett. a noi e a voi)","علينا وعليكم","3lina u 3likum"]}},
+    {"c":"diranno","t":["Che Dio abbia misericordia di lui.","الله يرحمو","Allah yr7mu"],"n":"Si dice nominando un defunto (per una donna: Allah yr7mha).","r":["Amen.","آمين","amin"]},
+    {"c":"diranno","t":["Arrivederci!","بسلامة","bslama"],"r":{"m":["Dio ti protegga.","الله يسلمك","Allah ysellmek"],"f":["Dio ti protegga.","الله يسلمك","Allah ysellmek"],"g":["Dio vi protegga.","الله يسلمكم","Allah ysellemkum"]}}
+  ]/*END*/;
+
   var state = {
     settings: { key: "", model: "", me: "m", to: "m", tier: "quick", speak: false },
     messages: []
   };
   var audioStore = {}; // id -> { wav: ArrayBuffer, url: string } (this session only)
+  // Per-model usage for the current Pacific day (when Google resets free quotas).
+  var quota = { day: "", used: {}, exhausted: {}, unavailable: {}, models: null, modelsAt: 0 };
+  var cooldown = {};   // model -> time its per-minute limit clears (this session only)
+  var noThinking = {}; // model -> true once it has refused our thinking setting
+  var cache = {};      // normalized request -> { o: translation, t: time }
 
   // ---------- storage ----------
   function load() {
@@ -568,6 +826,28 @@
       }));
     } catch (e) { /* ignore */ }
   }
+  function loadExtras() {
+    try {
+      var q = JSON.parse(localStorage.getItem(QUOTA_KEY) || "null");
+      if (q && typeof q === "object") {
+        if (typeof q.day === "string") quota.day = q.day;
+        ["used", "exhausted", "unavailable"].forEach(function (k) { if (q[k] && typeof q[k] === "object") quota[k] = q[k]; });
+        if (q.models && Array.isArray(q.models.lite) && Array.isArray(q.models.flash)) quota.models = q.models;
+        if (typeof q.modelsAt === "number") quota.modelsAt = q.modelsAt;
+      }
+    } catch (e) { /* start fresh */ }
+    try {
+      var c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      if (c && typeof c === "object") cache = c;
+      localStorage.removeItem("tarjman.cache.v1");
+    } catch (e) { /* start fresh */ }
+  }
+  function saveQuota() {
+    try { localStorage.setItem(QUOTA_KEY, JSON.stringify(quota)); } catch (e) { /* ignore */ }
+  }
+  function saveCache() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) { /* ignore */ }
+  }
 
   // ---------- helpers ----------
   function $(id) { return document.getElementById(id); }
@@ -598,8 +878,10 @@
   var threadEl = $("thread");
 
   // ---------- banner ----------
-  var bannerAction = null;
-  function showBanner(text, kind, actionLabel, action) {
+  var bannerAction = null, bannerOwner = null;
+  // owner names what the banner is about, so it can be removed once that is solved.
+  function showBanner(text, kind, actionLabel, action, owner) {
+    bannerOwner = owner || null;
     $("banner").className = "banner" + (kind === "info" ? " info" : "");
     $("banner-text").textContent = text;
     var b = $("banner-btn");
@@ -608,7 +890,8 @@
     if (actionLabel) b.textContent = actionLabel;
     $("banner").hidden = false;
   }
-  function hideBanner() { $("banner").hidden = true; }
+  function hideBanner() { $("banner").hidden = true; bannerOwner = null; }
+  function clearBanner(owner) { if (bannerOwner === owner) hideBanner(); }
   $("banner-btn").addEventListener("click", function () {
     var a = bannerAction;
     hideBanner();
@@ -805,10 +1088,10 @@
     var samples = mergeChunks(r.chunks);
     cleanupRec();
     if (dur < 0.7 || samples.length < rate * 0.5) {
-      $("dock-hint").textContent = "Troppo breve: tocca, parla, poi tocca di nuovo.";
+      $("dock-hint").textContent = "Troppo breve: riprova.";
       return;
     }
-    var pcm = normalizePeak(downsample(samples, rate, 16000));
+    var pcm = normalizePeak(trimSilence(downsample(samples, rate, 16000), 16000));
     var wav = encodeWav(pcm, 16000);
     var m = {
       id: uid(), dir: r.dir, kind: "audio", src: "", secs: Math.round(dur),
@@ -839,6 +1122,27 @@
       out[i] = b > a ? sum / (b - a) : 0;
     }
     return out;
+  }
+  // Cuts the silence before and after the speech (Gemini counts audio tokens by the second).
+  function trimSilence(buf, rate) {
+    var frame = Math.round(rate * 0.02), n = Math.floor(buf.length / frame);
+    if (n < 10) return buf;
+    var rms = new Float32Array(n);
+    for (var f = 0; f < n; f++) {
+      var sum = 0;
+      for (var i = f * frame; i < (f + 1) * frame; i++) sum += buf[i] * buf[i];
+      rms[f] = Math.sqrt(sum / frame);
+    }
+    // The level is taken from the 90th percentile, so a single knock cannot hide the speech.
+    var level = new Float32Array(rms).sort()[Math.floor(n * 0.9)];
+    var gate = Math.max(0.004, level * 0.06);
+    var first = 0, last = n - 1;
+    while (first < n && rms[first] < gate) first++;
+    while (last > first && rms[last] < gate) last--;
+    var pad = Math.round(0.4 * rate);
+    var start = Math.max(0, first * frame - pad), end = Math.min(buf.length, (last + 1) * frame + pad);
+    if (first >= n || end - start < rate * 0.5) return buf;
+    return buf.subarray(start, end);
   }
   function normalizePeak(buf) {
     var peak = 0;
@@ -890,52 +1194,281 @@
   $("rec-it").addEventListener("click", function () { onRecButton("it2dar"); });
   $("rec-cancel").addEventListener("click", cancelRec);
 
-  // ---------- Gemini ----------
-  function currentModel() { return str(state.settings.model) || DEFAULT_MODEL; }
-
-  function callModel(model, parts, schema, key) {
-    var gen = { responseMimeType: "application/json", responseSchema: schema, temperature: 0.2 };
-    if (/^gemini-2\.5-flash/.test(model)) {
-      gen.thinkingConfig = { thinkingBudget: state.settings.tier === "deep" ? -1 : 0 };
+  // ---------- free-tier day (Google resets quotas at midnight Pacific time) ----------
+  function pacificParts(t) {
+    var o = {};
+    try {
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles", hourCycle: "h23",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"
+      }).formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    } catch (e) { o = {}; }
+    if (!o.year) { // no time zone support: assume UTC-8
+      var d = new Date(t - 8 * 3600000);
+      o = { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes(), second: d.getUTCSeconds() };
     }
-    var body = JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: gen });
-    return fetch(API + encodeURIComponent(model) + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: body
-    }).catch(function () {
-      throw { code: "network" };
+    return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, s: +o.second };
+  }
+  function pacificDay(t) {
+    var p = pacificParts(t);
+    return p.y + "-" + p.mo + "-" + p.d;
+  }
+  function pacificOffset(t) {
+    var p = pacificParts(t);
+    return Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(t / 1000) * 1000;
+  }
+  function nextReset(t) {
+    var p = pacificParts(t);
+    var wall = Date.UTC(p.y, p.mo - 1, p.d + 1, 0, 0, 0);
+    var guess = wall - pacificOffset(t);
+    return wall - pacificOffset(guess); // corrects the hour when daylight saving changes overnight
+  }
+  function resetClock() {
+    return new Date(nextReset(Date.now())).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+  function rollDay() {
+    var today = pacificDay(Date.now());
+    if (quota.day === today) return;
+    quota.day = today;
+    quota.used = {};
+    quota.exhausted = {};
+    var week = Date.now() - 7 * 86400000;
+    Object.keys(quota.unavailable).forEach(function (k) { if (!(quota.unavailable[k] > week)) delete quota.unavailable[k]; });
+    saveQuota();
+  }
+
+  // ---------- Gemini ----------
+  function modelChain(tier) {
+    var found = quota.models;
+    var lite = found && found.lite.length ? found.lite.concat("gemini-flash-lite-latest") : LITE_MODELS;
+    var flash = found && found.flash.length ? found.flash.concat("gemini-flash-latest") : FLASH_MODELS;
+    var order = ((tier || state.settings.tier) === "deep" ? flash.concat(lite) : lite.concat(flash));
+    var custom = str(state.settings.model).replace(/^models\//, "");
+    if (custom) order = [custom].concat(order);
+    return order.filter(function (m, i) { return order.indexOf(m) === i; });
+  }
+
+  // Keeps the stable "gemini-X.Y-flash" and "gemini-X.Y-flash-lite" models from models.list, newest first.
+  function pickModels(list) {
+    var lite = [], flash = [];
+    (list || []).forEach(function (m) {
+      var name = String((m && m.name) || "").replace(/^models\//, "");
+      var methods = (m && m.supportedGenerationMethods) || [];
+      var x = /^gemini-(\d+)\.(\d+)-flash(-lite)?$/.exec(name);
+      if (!x || methods.indexOf("generateContent") === -1) return;
+      var major = +x[1], minor = +x[2];
+      if (major < 2 || (major === 2 && minor < 5)) return;
+      (x[3] ? lite : flash).push({ name: name, major: major, minor: minor });
+    });
+    function byNewest(a, b) { return b.major - a.major || b.minor - a.minor; }
+    function names(arr) { return arr.sort(byNewest).map(function (x) { return x.name; }); }
+    return { lite: names(lite), flash: names(flash) };
+  }
+
+  function genConfig(model, schema, plain, tier) {
+    var gen = { responseMimeType: "application/json", responseSchema: schema };
+    var deep = tier === "deep";
+    if (/^gemini-[12]\./.test(model)) {
+      gen.temperature = 0.2;
+      gen.thinkingConfig = { thinkingBudget: deep ? -1 : 0 };
+    } else if (/^gemini-/.test(model)) {
+      // Gemini 3 keeps its default temperature; full Flash models from 3.7 on refuse "minimal".
+      gen.thinkingConfig = { thinkingLevel: deep ? "medium" : (/lite/.test(model) ? "minimal" : "low") };
+    }
+    if (plain || noThinking[model]) delete gen.thinkingConfig;
+    return gen;
+  }
+
+  function request(url, opts) {
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    // Audio can take minutes to upload on a weak connection: allow about 16 kB per second on top.
+    var limit = REQUEST_TIMEOUT + (opts.body ? Math.min(180000, Math.round(opts.body.length / 16)) : 0);
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, limit) : null;
+    if (ctl) opts.signal = ctl.signal;
+    return fetch(url, opts).catch(function (err) {
+      throw { code: err && err.name === "AbortError" ? "timeout" : "network" };
     }).then(function (res) {
       return res.json().catch(function () { return null; }).then(function (data) {
-        if (!res.ok) {
-          var msg = (data && data.error && data.error.message) || "";
-          if (res.status === 404 || /is not found|not supported for generateContent/i.test(msg)) throw { code: "model_not_found", detail: msg };
-          if (/API key not valid|API_KEY_INVALID|API key expired/i.test(msg) || (data && JSON.stringify(data).indexOf("API_KEY_INVALID") !== -1)) throw { code: "bad_key" };
-          if (res.status === 429) throw { code: "rate_limited" };
-          if (res.status >= 500) throw { code: "server" };
-          throw { code: "rejected", detail: msg };
-        }
-        var cand = data && data.candidates && data.candidates[0];
-        if (!cand) throw { code: data && data.promptFeedback && data.promptFeedback.blockReason ? "blocked" : "empty" };
-        var text = ((cand.content && cand.content.parts) || []).map(function (p) { return p.text || ""; }).join("");
-        if (!text) throw { code: cand.finishReason === "SAFETY" ? "blocked" : "empty" };
-        try { return JSON.parse(text); } catch (e) {
-          var mm = text.match(/\{[\s\S]*\}/);
-          if (mm) { try { return JSON.parse(mm[0]); } catch (e2) { /* fall through */ } }
-          throw { code: "bad_json" };
-        }
+        return { res: res, data: data };
       });
+    }).then(function (r) {
+      if (timer) clearTimeout(timer);
+      return r;
+    }, function (e) {
+      if (timer) clearTimeout(timer);
+      throw e;
     });
   }
 
-  function gemini(parts, schema) {
+  function quotaInfo(err) {
+    var scope = "", retry = 0;
+    (err.details || []).forEach(function (d) {
+      var type = String((d && d["@type"]) || "");
+      if (/QuotaFailure$/.test(type)) {
+        (d.violations || []).forEach(function (v) {
+          var id = String((v && (v.quotaId || v.quotaMetric)) || "");
+          if (/PerDay/i.test(id)) scope = "day";
+          else if (/PerMinute/i.test(id) && scope !== "day") scope = "minute";
+        });
+      } else if (/RetryInfo$/.test(type)) {
+        retry = parseFloat(d.retryDelay) || 0;
+      }
+    });
+    var msg = String(err.message || "");
+    if (!scope && /per ?day/i.test(msg)) scope = "day";
+    if (!retry) { var r = /retry in ([\d.]+)\s*s/i.exec(msg); if (r) retry = parseFloat(r[1]); }
+    return { scope: scope || "minute", retry: retry };
+  }
+
+  function classify(res, data) {
+    var err = (data && data.error) || {};
+    var msg = String(err.message || "");
+    var raw = data ? JSON.stringify(data) : "";
+    if (/API key not valid|API_KEY_INVALID|API key expired/i.test(msg) || raw.indexOf("API_KEY_INVALID") !== -1) return { code: "bad_key" };
+    if (res.status === 429 || err.status === "RESOURCE_EXHAUSTED") {
+      if (/prepay|credits? (are |is )?depleted/i.test(msg)) return { code: "billing", detail: msg };
+      var q = quotaInfo(err);
+      return { code: "rate_limited", scope: q.scope, retry: q.retry };
+    }
+    if (res.status === 404 || /is not found|not supported for generateContent|no longer available/i.test(msg)) return { code: "model_not_found", detail: msg };
+    if (res.status === 400 && /thinking/i.test(msg)) return { code: "thinking", detail: msg };
+    if (res.status === 403) return { code: "forbidden", detail: msg };
+    if (res.status >= 500) return { code: "server" };
+    return { code: "rejected", detail: msg };
+  }
+
+  function callModel(model, parts, schema, key, plain, tier) {
+    return request(API + "models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ role: "user", parts: parts }], generationConfig: genConfig(model, schema, plain, tier) })
+    }).then(function (r) {
+      var data = r.data;
+      if (!r.res.ok) throw classify(r.res, data);
+      var cand = data && data.candidates && data.candidates[0];
+      if (!cand) throw { code: data && data.promptFeedback && data.promptFeedback.blockReason ? "blocked" : "empty" };
+      var text = ((cand.content && cand.content.parts) || []).map(function (p) { return p.thought ? "" : (p.text || ""); }).join("");
+      if (!text) throw { code: cand.finishReason === "SAFETY" ? "blocked" : "empty" };
+      try { return JSON.parse(text); } catch (e) {
+        var mm = text.match(/\{[\s\S]*\}/);
+        if (mm) { try { return JSON.parse(mm[0]); } catch (e2) { /* fall through */ } }
+        throw { code: "bad_json" };
+      }
+    });
+  }
+
+  function usable(model, now) {
+    return !quota.exhausted[model] && !quota.unavailable[model] && !(cooldown[model] > now);
+  }
+
+  // Tries the models in order. A model that is out of quota for the day, or gone, is skipped until
+  // the next reset; one that hit its per-minute limit is skipped until that minute is over.
+  // onWait(deadline) is called when every model is waiting for its minute (0 when the retry starts).
+  // probe: the user asked to retry, so try one model even if all are marked out for the day
+  // (billing may have been turned on).
+  function gemini(parts, schema, onWait, probe, tier) {
     var key = str(state.settings.key);
     if (!key) return Promise.reject({ code: "no_key" });
-    var model = currentModel();
-    return callModel(model, parts, schema, key).catch(function (e) {
-      if (e && e.code === "model_not_found" && model !== FALLBACK_MODEL) return callModel(FALLBACK_MODEL, parts, schema, key);
-      throw e;
+    rollDay();
+    tier = tier || state.settings.tier;
+    var tried = {}, lastErr = null, waits = 0, serverErrors = 0, probed = false;
+
+    function giveUp(chain) {
+      if (chain.every(function (m) { return quota.unavailable[m]; })) return { code: "no_models" };
+      if (chain.every(function (m) { return quota.exhausted[m] || quota.unavailable[m]; })) return { code: "day_exhausted" };
+      if (serverErrors) return { code: "server" }; // the model still available is overloaded
+      return lastErr || { code: "rate_limited", scope: "minute" };
+    }
+
+    function attempt() {
+      var current = str(state.settings.key);
+      if (!current) throw { code: "no_key" };
+      if (current !== key) { key = current; tried = {}; lastErr = null; } // a new key was saved meanwhile
+      var sent = key;
+      var now = Date.now();
+      var chain = modelChain(tier);
+      var model = chain.filter(function (m) { return !tried[m] && usable(m, now); })[0];
+      if (!model) {
+        var soonest = chain.filter(function (m) {
+          return !quota.exhausted[m] && !quota.unavailable[m] && cooldown[m] > now;
+        }).map(function (m) { return cooldown[m]; }).sort(function (a, b) { return a - b; })[0];
+        if (soonest && waits < 2 && soonest - now <= 70000) {
+          waits++;
+          tried = {};
+          if (onWait) onWait(soonest + 300);
+          return new Promise(function (ok) { setTimeout(ok, soonest - now + 300); }).then(function () {
+            if (onWait) onWait(0);
+            return attempt();
+          });
+        }
+        // Every model is marked out for the day: check one again when asked to, or 10 minutes after
+        // the newest mark (a failed check refreshes its mark, so it postpones the next one). One per call.
+        var newest = 0;
+        chain.forEach(function (m) { if (+quota.exhausted[m] > newest) newest = +quota.exhausted[m]; });
+        model = probed || !(probe || now - newest > 600000) ? null : chain.filter(function (m) {
+          return quota.exhausted[m] && !quota.unavailable[m] && !tried[m];
+        })[0];
+        probed = true;
+        if (!model || soonest) throw giveUp(chain);
+      }
+      tried[model] = true;
+      return callModel(model, parts, schema, sent, false, tier).catch(function (e) {
+        if (!e || e.code !== "thinking") throw e;
+        noThinking[model] = true;
+        return callModel(model, parts, schema, sent, true, tier);
+      }).then(function (data) {
+        if (str(state.settings.key) === sent) {
+          // A model that was out for the day answered: the limits changed, trust them all again.
+          if (quota.exhausted[model]) quota.exhausted = {};
+          quota.used[model] = (quota.used[model] || 0) + 1;
+          saveQuota();
+        }
+        return { data: data, model: model };
+      }, function (e) {
+        if (str(state.settings.key) !== sent) return attempt(); // answer for a key that was replaced
+        lastErr = e;
+        var code = e && e.code;
+        if (code === "rate_limited") {
+          if (e.scope === "day") { quota.exhausted[model] = Date.now(); saveQuota(); }
+          else cooldown[model] = Date.now() + Math.min(65, Math.max(10, e.retry || 60)) * 1000;
+          return attempt();
+        }
+        if (code === "model_not_found") {
+          quota.unavailable[model] = Date.now();
+          saveQuota();
+          if (Date.now() - quota.modelsAt > 86400000) refreshModels();
+          return attempt();
+        }
+        // Google overloaded or down: one more model may answer, but do not walk the whole chain.
+        if (code === "server" && ++serverErrors < 2) return attempt();
+        throw e;
+      });
+    }
+    return Promise.resolve().then(attempt);
+  }
+
+  // Lists the models this key can use. It checks the key without spending any translation.
+  function listModels(key) {
+    return request(API + "models?pageSize=1000", {
+      method: "GET",
+      headers: { "x-goog-api-key": key }
+    }).then(function (r) {
+      if (!r.res.ok) throw classify(r.res, r.data);
+      return (r.data && r.data.models) || [];
     });
+  }
+  var refreshing = false;
+  function refreshModels() {
+    var key = str(state.settings.key);
+    if (!key || refreshing) return;
+    refreshing = true;
+    listModels(key).then(function (list) {
+      if (str(state.settings.key) !== key) return;
+      var picked = pickModels(list);
+      if (picked.lite.length || picked.flash.length) quota.models = picked;
+      quota.modelsAt = Date.now();
+      saveQuota();
+    }).catch(function () { /* keep what we have */ }).then(function () { refreshing = false; });
   }
 
   function errCopy(e) {
@@ -943,11 +1476,16 @@
     switch (code) {
       case "no_key": return "Manca la chiave Gemini: inseriscila nelle impostazioni.";
       case "bad_key": return "La chiave Gemini non è valida. Controllala nelle impostazioni.";
-      case "rate_limited": return "Hai raggiunto il limite di Gemini (il piano gratuito ha un tetto al minuto e al giorno). Aspetta un minuto e riprova.";
+      case "rate_limited": return "Troppe traduzioni in un minuto per il piano gratuito di Gemini. Aspetta un minuto e riprova.";
+      case "day_exhausted": return "Per oggi hai finito le traduzioni gratuite di Gemini su tutti i modelli. Ripartono alle " + resetClock() + ". Intanto le \"Frasi pronte\" funzionano senza chiave. Se hai attivato la fatturazione, premi Riprova.";
+      case "billing": return "Il credito prepagato di Gemini è finito: ricaricalo su aistudio.google.com.";
+      case "no_models": return "Nessun modello Gemini risponde con questa chiave. Apri le impostazioni e premi \"Salva e prova\".";
+      case "forbidden": return "Google non permette a questa chiave di usare Gemini" + (e.detail ? ": " + e.detail.slice(0, 180) : ".");
       case "network": return "Niente connessione a internet. Riprova quando sei online.";
+      case "timeout": return "La connessione è lenta o Gemini ci mette troppo a rispondere. Riprova.";
       case "server": return "Gemini non risponde in questo momento. Riprova tra poco.";
       case "blocked": return "Gemini non ha tradotto questo contenuto.";
-      case "model_not_found": return "Il modello scritto nelle impostazioni non esiste. Svuota il campo \"Modello Gemini\".";
+      case "model_not_found": return "Questo modello Gemini non esiste più. Apri le impostazioni e premi \"Salva e prova\".";
       case "no_audio": return "L'audio non è più disponibile: registra di nuovo.";
       case "unheard": return e.detail || "Non ho capito l'audio. Riprova più vicino al telefono, una persona alla volta.";
       case "rejected": return "Gemini ha rifiutato la richiesta" + (e.detail ? ": " + e.detail.slice(0, 180) : ".");
@@ -987,6 +1525,7 @@
         "- Tone: warm and respectful, as within a family. Keep the meaning; add nothing.",
         ctx,
         'Fields: "ar" = the Darija in Arabic script, as Moroccans write it in messages; "lat" = the same Darija in Latin letters, for an Italian to read aloud; "note" = one short note in Italian only if something needs care (politeness, a word with no equivalent, an ambiguity you resolved), otherwise an empty string.',
+        STANDALONE_RULE,
         LAT_RULES
       ].join("\n");
     }
@@ -1000,6 +1539,7 @@
       'Then: "lat" = the same Darija in Latin letters; "it" = a natural, everyday Italian translation; "note" = one short note in Italian only if useful (an uncertainty, or the cultural meaning of an expression), otherwise an empty string.',
       'If what they said is a customary formula with a set response (for example "l7amdulillah 3la slama" is answered with "Allah ysellmek", "bessa7a" with "Allah y3tik sa7a"), set "reply" to the customary response ("ar" in Arabic script, "lat" in Latin letters, "it" its meaning in Italian); the user answering is ' + me + '. Otherwise set "reply" to null.',
       ctx,
+      STANDALONE_RULE,
       LAT_RULES
     ].join("\n");
   }
@@ -1010,7 +1550,7 @@
     if (dir === "it2dar") {
       var ar = str(res.ar), lat = str(res.lat);
       if (!ar && !lat) return { empty: true, note: note };
-      return { heard: heard, ar: ar, lat: lat, note: note };
+      return { heard: heard, ar: ar, lat: lat, note: note, standalone: res.standalone === true };
     }
     var it = str(res.it);
     if (!it) return { empty: true, note: note };
@@ -1018,11 +1558,235 @@
     if (res.reply && typeof res.reply === "object" && str(res.reply.ar)) {
       reply = { ar: str(res.reply.ar), lat: str(res.reply.lat), it: str(res.reply.it) };
     }
-    return { heard: heard, it: it, lat: str(res.lat), note: note, reply: reply };
+    return { heard: heard, it: it, lat: str(res.lat), note: note, reply: reply, standalone: res.standalone === true };
+  }
+
+  // ---------- translation memory ----------
+  // Loose forms, for matching the phrasebook and for searching it.
+  function normIt(s) {
+    return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function normDar(s) {
+    return String(s || "").toLowerCase().normalize("NFD")
+      .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x660); })
+      .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x6f0); })
+      .replace(/[̀-ًͯ-ٰٟـ]/g, "")
+      .replace(/[آأإٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
+      .replace(/ou/g, "u").replace(/o/g, "u").replace(/ch/g, "sh")
+      .replace(/[^a-z0-9ء-يپچڤڭگ]+/g, " ")
+      .replace(/([^0-9])\1+/g, "$1").trim();
+  }
+  // "?" for a question, "." for a sentence that ends like a statement, "" when it does not say.
+  function sentenceKind(s) {
+    s = String(s || "").trim();
+    if (/[?؟]/.test(s)) return "?";
+    return /[.!]$/.test(s) ? "." : "";
+  }
+  // The memory only reuses a translation for the very same text: accents, digits and "?" count.
+  function memoKey(dir, to, src, me, tier) {
+    var n = String(src || "").normalize("NFC").toLowerCase().replace(/\s+/g, " ")
+      .replace(/^[\s"'«»“”]+|[\s"'«»“”.,;:]+$/g, "");
+    if (!n) return "";
+    return [dir, me || state.settings.me, dir === "it2dar" ? (to || "m") : "-", tier || state.settings.tier, n].join("|");
+  }
+  function memoGet(k) {
+    var hit = k && cache[k];
+    if (!hit || !hit.o) return null;
+    hit.t = Date.now();
+    saveCache();
+    return JSON.parse(JSON.stringify(hit.o));
+  }
+  function memoPut(k, out) {
+    if (!k || !out) return;
+    cache[k] = { o: out, t: Date.now() };
+    var keys = Object.keys(cache);
+    if (keys.length > CACHE_MAX) {
+      keys.sort(function (a, b) { return (cache[a].t || 0) - (cache[b].t || 0); })
+        .slice(0, keys.length - CACHE_MAX).forEach(function (x) { delete cache[x]; });
+    }
+    saveCache();
+  }
+
+  // ---------- phrasebook ----------
+  // to: who is listening ("m"/"f"/"g"); me: the gender an "M"/"F" split follows (the user by default).
+  function pickVariant(v, to, me) {
+    me = me || state.settings.me;
+    for (var d = 0; d < 3 && v && !Array.isArray(v); d++) {
+      v = ("M" in v) ? v[me === "f" ? "F" : "M"] : (v[to] || v.m);
+    }
+    return Array.isArray(v) ? v : null;
+  }
+  function eachLeaf(v, fn) {
+    if (Array.isArray(v)) fn(v);
+    else if (v && typeof v === "object") Object.keys(v).forEach(function (k) { eachLeaf(v[k], fn); });
+  }
+  function heardOut(e, leaf, to) {
+    var r = e.r ? pickVariant(e.r, to) : null;
+    return { heard: leaf[1], it: leaf[0], lat: leaf[2], note: e.n || "", reply: r ? { ar: r[1], lat: r[2], it: r[0] } : null };
+  }
+  // A question never matches a statement, and the other way round.
+  function sameKind(typed, entry) {
+    var a = sentenceKind(typed), b = sentenceKind(entry);
+    return !a || (a === "?" ? b === "?" : b !== "?");
+  }
+  // What a user may type for a displayed phrase: "Salve! (la pace sia con voi)" also as "Salve!",
+  // "Alla salute! / Buon appetito!" also as either half.
+  function itForms(s) {
+    var out = [s];
+    String(s).replace(/\s*\([^)]*\)/g, "").split(" / ").forEach(function (x) {
+      if (x && out.indexOf(x) === -1) out.push(x);
+    });
+    return out;
+  }
+  // True when the last finished message is a question the user asked: a bare "labas" is then the answer.
+  function afterUserQuestion(m) {
+    var idx = state.messages.indexOf(m);
+    var prev = state.messages.slice(0, idx < 0 ? state.messages.length : idx).filter(function (x) {
+      return x.status === "done" && !x.example && x.out;
+    });
+    var last = prev[prev.length - 1];
+    return !!last && last.dir === "it2dar" && sentenceKind(last.src) === "?";
+  }
+  function phraseAnswer(m) {
+    var to = m.to || state.settings.to;
+    var i, e, t;
+    if (m.dir === "it2dar") {
+      var k = normIt(m.src);
+      if (!k) return null;
+      for (i = 0; i < PHRASES.length; i++) {
+        e = PHRASES[i];
+        // "Ti diranno" formulas are said to one person; the gendered ones are about the user.
+        if (e.c === "diranno" && (!Array.isArray(e.t) || to === "g")) continue;
+        t = pickVariant(e.t, to);
+        if (t && itForms(t[0]).some(function (f) { return normIt(f) === k && sameKind(m.src, f); })) {
+          return { ar: t[1], lat: t[2], note: e.n || "" };
+        }
+      }
+      return null;
+    }
+    var d = normDar(m.src);
+    if (!d) return null;
+    var answering = !sentenceKind(m.src) && afterUserQuestion(m);
+    // Things relatives say come first: they carry the customary reply.
+    var order = PHRASES.filter(function (x) { return x.c === "diranno"; })
+      .concat(PHRASES.filter(function (x) { return x.c !== "diranno"; }));
+    function hit(leaf) {
+      return leaf && (normDar(leaf[1]) === d || normDar(leaf[2]) === d) && sameKind(m.src, leaf[2]) &&
+        !(answering && sentenceKind(leaf[2]) === "?");
+    }
+    for (i = 0; i < order.length; i++) {
+      // Prefer the form that fits who is talking. "Ti diranno" phrases are said to the user. Any other
+      // phrase is one the user normally says, here said by the relative: the relative is the speaker
+      // (M/F, from "Parli a") and the user is the one listening.
+      var found = order[i].c === "diranno" ? pickVariant(order[i].t, to)
+        : pickVariant(order[i].t, state.settings.me, to === "f" ? "f" : "m");
+      if (!hit(found)) {
+        found = null;
+        eachLeaf(order[i].t, function (leaf) { if (!found && hit(leaf)) found = leaf; });
+      }
+      if (found) return heardOut(order[i], found, to);
+    }
+    return null;
+  }
+
+  var phCat = "saluti";
+  function openPhrases() {
+    updateTo();
+    $("ph-search").value = "";
+    renderPhrases();
+    $("phrases").hidden = false;
+    $("phrases-backdrop").hidden = false;
+    $("phrases").scrollTop = 0;
+    $("close-phrases").focus();
+  }
+  function closePhrases() {
+    $("phrases").hidden = true;
+    $("phrases-backdrop").hidden = true;
+    $("open-phrases").focus();
+  }
+  function renderPhrases() {
+    var raw = $("ph-search").value.trim();
+    var q = normIt(raw), qd = normDar(raw);
+    var to = state.settings.to;
+    var cats = $("ph-cats");
+    if (!cats.firstChild) {
+      PHRASE_CATS.forEach(function (c) {
+        var b = btn(c[1], "pill", function () { phCat = c[0]; $("ph-search").value = ""; renderPhrases(); });
+        b.setAttribute("data-cat", c[0]);
+        cats.appendChild(b);
+      });
+    }
+    Array.prototype.forEach.call(cats.children, function (b) {
+      b.setAttribute("aria-pressed", String(!raw && phCat === b.getAttribute("data-cat")));
+    });
+    var list = $("ph-list");
+    list.textContent = "";
+    var shown = 0;
+    PHRASES.forEach(function (e) {
+      var t = pickVariant(e.t, to);
+      if (!t) return;
+      if (raw) {
+        var hit = (q && normIt(t[0]).indexOf(q) !== -1) ||
+          (qd && (normDar(t[1]).indexOf(qd) !== -1 || normDar(t[2]).indexOf(qd) !== -1));
+        if (!hit) return;
+      } else if (e.c !== phCat) {
+        return;
+      }
+      var heard = e.c === "diranno";
+      var item = el("button", "ph-item");
+      item.type = "button";
+      item.appendChild(el("span", "ph-main", heard ? t[2] : t[0]));
+      item.appendChild(el("span", "ph-sub", heard ? t[0] : t[2]));
+      item.addEventListener("click", function () { usePhrase(e); });
+      list.appendChild(item);
+      shown++;
+    });
+    if (!shown) list.appendChild(el("p", "ph-empty", "Nessuna frase trovata. Scrivila con \"Scrivi\": la traduce Gemini."));
+  }
+  function usePhrase(e) {
+    unlockSpeech();
+    var to = state.settings.to;
+    var t = pickVariant(e.t, to);
+    if (!t) return;
+    var heard = e.c === "diranno";
+    var m = {
+      id: uid(), dir: heard ? "dar2it" : "it2dar", kind: "text", src: heard ? t[1] : t[0],
+      to: heard ? null : to, status: "pending", ts: Date.now()
+    };
+    closePhrases();
+    addMessage(m, heard ? heardOut(e, t, to) : { ar: t[1], lat: t[2], note: e.n || "" });
+  }
+
+  // A typed sentence that is already in the phrasebook or was translated before costs nothing.
+  function localAnswer(m) {
+    var ph = phraseAnswer(m);
+    if (ph) return { source: "phrase", out: ph };
+    var memo = memoGet(memoKey(m.dir, m.to, m.src));
+    if (memo) return { source: "memo", out: memo };
+    return null;
   }
 
   // ---------- translate ----------
-  function translate(m) {
+  // force: skip the phrasebook and the memory. probe: the user tapped a button to retry.
+  function translate(m, force, probe) {
+    var keep = force && m.local && m.out ? { local: m.local, out: m.out } : null;
+    m.local = null;
+    m.waitUntil = 0;
+    m.forced = !!force;
+    m.forceErr = null;
+    if (m.kind === "text" && !force) {
+      var local = localAnswer(m);
+      if (local) {
+        m.local = local.source;
+        if (local.source === "memo") delete local.out.heard; // keep what the user typed
+        finish(m, local.out, null);
+        return;
+      }
+    }
+    // The prompt is built for these settings: the memory must be filed under them too.
+    var me = state.settings.me, tier = state.settings.tier;
+    var askKey = m.kind === "text" ? memoKey(m.dir, m.to, m.src, me, tier) : "";
     var parts;
     if (m.kind === "audio") {
       var a = audioStore[m.id];
@@ -1031,17 +1795,69 @@
     } else {
       parts = [{ text: buildPrompt(m) }];
     }
-    gemini(parts, m.dir === "it2dar" ? SCHEMA_IT2DAR : SCHEMA_DAR2IT).then(function (res) {
-      var out = normalize(res, m.dir);
+    gemini(parts, m.dir === "it2dar" ? SCHEMA_IT2DAR : SCHEMA_DAR2IT, function (until) {
+      if (m.status !== "pending") return;
+      m.waitUntil = until;
+      render();
+      if (until) startWaitTicker();
+    }, probe, tier).then(function (r) {
+      var out = normalize(r.data, m.dir);
       if (!out) throw { code: "bad_json" };
       if (out.empty) throw { code: "unheard", detail: out.note };
+      var standalone = out.standalone;
+      delete out.standalone;
+      m.model = r.model;
+      clearBanner("key");
+      var copy = JSON.parse(JSON.stringify(out));
       finish(m, out, null);
+      // Only typed sentences whose translation does not depend on the conversation are kept.
+      if (m.kind === "text") {
+        var heardKey = memoKey(m.dir, m.to, m.src, me, tier);
+        if (standalone) {
+          memoPut(askKey, copy);
+          if (heardKey !== askKey) memoPut(heardKey, copy);
+        } else if (cache[askKey] || cache[heardKey]) {
+          delete cache[askKey];
+          delete cache[heardKey];
+          saveCache();
+        }
+      }
     }).catch(function (e) {
-      finish(m, null, e);
+      if (!keep) { finish(m, null, e); return; }
+      // "Traduci con Gemini" failed: keep showing the translation we already had.
+      m.waitUntil = 0;
+      m.status = "done";
+      m.err = null;
+      m.local = keep.local;
+      m.out = keep.out;
+      if (e && (e.code === "bad_key" || e.code === "no_key")) {
+        showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); }, "key");
+      } else {
+        m.forceErr = errCopy(e);
+      }
+      save();
+      render();
     });
   }
 
+  // Counts down "riprovo da solo tra N s" without rebuilding the conversation every second.
+  var waitTicker = null;
+  function startWaitTicker() {
+    if (waitTicker) return;
+    waitTicker = setInterval(function () {
+      var any = false;
+      state.messages.forEach(function (m) {
+        if (m.status !== "pending" || !m.waitUntil) return;
+        any = true;
+        var n = threadEl.querySelector('[data-id="' + m.id + '"] .wait-n');
+        if (n) n.textContent = String(Math.max(0, Math.ceil((m.waitUntil - Date.now()) / 1000)));
+      });
+      if (!any) { clearInterval(waitTicker); waitTicker = null; }
+    }, 1000);
+  }
+
   function finish(m, out, e) {
+    m.waitUntil = 0;
     if (out) {
       if (out.heard) m.src = out.heard;
       delete out.heard;
@@ -1053,7 +1869,7 @@
       m.status = "error";
       m.err = errCopy(e);
       if (e && (e.code === "bad_key" || e.code === "no_key")) {
-        showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); });
+        showBanner(errCopy(e), "error", "Apri impostazioni", function () { openSheet("key"); }, "key");
       }
     }
     save();
@@ -1061,16 +1877,21 @@
     scrollToEnd();
   }
 
-  function addMessage(m) {
+  function addMessage(m, phrase) {
     if (state.messages.some(function (x) { return x.example; })) {
       state.messages = state.messages.filter(function (x) { return !x.example; });
     }
     state.messages.push(m);
-    $("dock-hint").textContent = "Tocca per registrare, tocca di nuovo per tradurre.";
+    $("dock-hint").textContent = "Tocca, parla, poi tocca di nuovo.";
+    keepAwake();
+    if (phrase) {
+      m.local = "phrase";
+      finish(m, phrase, null);
+      return;
+    }
     save();
     render();
     scrollToEnd();
-    keepAwake();
     translate(m);
   }
 
@@ -1078,21 +1899,23 @@
     unlockSpeech();
     var text = $("msg").value.trim();
     if (!text) { $("msg").focus(); return; }
-    if (!state.settings.key) { openSheet("key"); return; }
     if (dir === "it2dar" && ARABIC_RE.test(text)) dir = "dar2it";
-    $("msg").value = "";
-    autosize();
-    addMessage({
+    var m = {
       id: uid(), dir: dir, kind: "text", src: text,
       to: dir === "it2dar" ? state.settings.to : null, status: "pending", ts: Date.now()
-    });
+    };
+    if (!state.settings.key && !localAnswer(m)) { openSheet("key"); return; }
+    $("msg").value = "";
+    autosize();
+    addMessage(m);
   }
 
-  function retry(m) {
+  function retry(m, force) {
+    if (force && !state.settings.key) { openSheet("key"); return; }
     m.status = "pending";
     m.err = null;
     render();
-    translate(m);
+    translate(m, force, true);
   }
 
   function correct(m) {
@@ -1109,11 +1932,13 @@
   function renderMsg(m) {
     var mine = m.dir === "it2dar";
     var b = el("article", "msg " + (mine ? "me" : "fam"));
+    b.setAttribute("data-id", m.id);
 
     var who = el("div", "who");
     who.appendChild(el("span", null, mine ? "Tu · italiano" : "Famiglia · darija"));
     if (mine && m.to && TO_LABEL[m.to]) who.appendChild(el("span", "to-tag", TO_LABEL[m.to]));
     if (m.example) who.appendChild(el("span", "ex-tag", "Esempio"));
+    if (m.status === "done" && m.local) who.appendChild(el("span", "ex-tag", m.local === "phrase" ? "Frase pronta" : "Già tradotta"));
     b.appendChild(who);
 
     var a = audioStore[m.id];
@@ -1124,7 +1949,16 @@
     }
 
     if (m.status === "pending") {
-      b.appendChild(el("div", "pending", m.kind === "audio" ? "Ascolto e traduco…" : "Traduco…"));
+      var pend = el("div", "pending", m.waitUntil ? null : (m.kind === "audio" ? "Ascolto e traduco…" : "Traduco…"));
+      if (m.waitUntil) {
+        var shown = el("span", null, "Troppe richieste in un minuto: riprovo da solo tra ");
+        shown.setAttribute("aria-hidden", "true");
+        shown.appendChild(el("span", "wait-n", String(Math.max(0, Math.ceil((m.waitUntil - Date.now()) / 1000)))));
+        shown.appendChild(document.createTextNode(" s…"));
+        pend.appendChild(shown);
+        pend.appendChild(el("span", "sr-only", "Troppe richieste in un minuto: riprovo da solo tra poco."));
+      }
+      b.appendChild(pend);
       return b;
     }
 
@@ -1132,7 +1966,7 @@
 
     if (m.status === "error") {
       b.appendChild(el("div", "err", m.err || "Qualcosa non ha funzionato."));
-      if (m.kind === "text" || a) actions.appendChild(btn("Riprova", "chip-btn", function () { retry(m); }));
+      if (m.kind === "text" || a) actions.appendChild(btn("Riprova", "chip-btn", function () { retry(m, m.forced); }));
       if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
       if (m.src) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
       b.appendChild(actions);
@@ -1187,6 +2021,8 @@
       actions.appendChild(cp2);
     }
     if (a) actions.appendChild(btn("Riascolta", "chip-btn quiet", function () { playRec(a); }));
+    if (m.forceErr) b.appendChild(el("div", "err", m.forceErr));
+    if (m.local && m.kind === "text") actions.appendChild(btn(m.forceErr ? "Riprova" : "Traduci con Gemini", "chip-btn quiet", function () { retry(m, true); }));
     if (!m.example) actions.appendChild(btn("Correggi", "chip-btn quiet", function () { correct(m); }));
     b.appendChild(actions);
     return b;
@@ -1214,10 +2050,14 @@
 
   // ---------- dock ----------
   function updateTo() {
-    ["m", "f", "g"].forEach(function (k) { $("to-" + k).setAttribute("aria-checked", String(state.settings.to === k)); });
+    ["m", "f", "g"].forEach(function (k) {
+      $("to-" + k).setAttribute("aria-checked", String(state.settings.to === k));
+      $("ph-to-" + k).setAttribute("aria-checked", String(state.settings.to === k));
+    });
   }
   ["m", "f", "g"].forEach(function (k) {
     $("to-" + k).addEventListener("click", function () { state.settings.to = k; updateTo(); save(); });
+    $("ph-to-" + k).addEventListener("click", function () { state.settings.to = k; updateTo(); save(); renderPhrases(); });
   });
 
   function setTextOpen(open) {
@@ -1236,6 +2076,10 @@
     t.style.height = Math.min(t.scrollHeight + 2, 140) + "px";
   }
   $("msg").addEventListener("input", autosize);
+  $("open-phrases").addEventListener("click", openPhrases);
+  $("close-phrases").addEventListener("click", closePhrases);
+  $("phrases-backdrop").addEventListener("click", closePhrases);
+  $("ph-search").addEventListener("input", renderPhrases);
   $("send-it").addEventListener("click", function () { sendText("it2dar"); });
   $("send-dar").addEventListener("click", function () { sendText("dar2it"); });
 
@@ -1252,8 +2096,26 @@
       ? "Usa la voce araba del telefono: l'accento non è marocchino, ma di solito si capisce."
       : "Su questo dispositivo non c'è una voce araba: il pulsante Ascolta resta nascosto.";
   }
+  function updateUsage() {
+    rollDay();
+    var total = 0, parts = [];
+    Object.keys(quota.used).forEach(function (k) {
+      total += quota.used[k];
+      parts.push(k.replace(/^gemini-/, "") + ": " + quota.used[k]);
+    });
+    var txt = total
+      ? "Oggi " + total + (total === 1 ? " traduzione" : " traduzioni") + " con Gemini (" + parts.join(", ") + ")."
+      : "Oggi nessuna traduzione con Gemini.";
+    var out = Object.keys(quota.exhausted).map(function (k) { return k.replace(/^gemini-/, ""); });
+    if (out.length) txt += " Finiti per oggi: " + out.join(", ") + ".";
+    $("usage").textContent = txt + " Il conteggio gratuito riparte alle " + resetClock() + ".";
+    var n = Object.keys(cache).length;
+    $("forget").textContent = "Dimentica le frasi già tradotte (" + n + ")";
+    $("forget").disabled = !n;
+  }
   function openSheet(focus) {
     updateSettingsUI();
+    updateUsage();
     $("api-key").value = state.settings.key;
     $("model").value = state.settings.model;
     $("clear-confirm").hidden = true;
@@ -1268,6 +2130,7 @@
     if (model !== state.settings.model) { state.settings.model = model; save(); }
     sheet.hidden = true;
     backdrop.hidden = true;
+    $("open-settings").focus();
   }
   $("open-settings").addEventListener("click", function () { openSheet(); });
   $("close-settings").addEventListener("click", closeSheet);
@@ -1292,17 +2155,47 @@
       checkKeyBanner();
       return;
     }
+    var prevKey = state.settings.key;
+    if (k !== prevKey) {
+      // Another key may belong to another Google project, with its own limits and models.
+      quota.used = {};
+      quota.exhausted = {};
+      quota.unavailable = {};
+      quota.models = null;
+      quota.modelsAt = 0;
+      cooldown = {};
+      noThinking = {};
+      saveQuota();
+    }
     state.settings.key = k;
     save();
     status.className = "fhelp";
     status.textContent = "Verifico la chiave…";
     $("key-save").disabled = true;
-    gemini([{ text: 'Reply with {"ok": true}' }], {
-      type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"]
-    }).then(function () {
+    // Asking for the model list checks the key without using up a translation.
+    listModels(k).then(function (list) {
+      if (str(state.settings.key) !== k) return;
+      rollDay();
+      var chain = modelChain();
+      // Same condition as the "finished for today" error: every model is out, at least one for the day.
+      var wasOut = k === prevKey &&
+        chain.some(function (m) { return quota.exhausted[m] && !quota.unavailable[m]; }) &&
+        chain.every(function (m) { return quota.exhausted[m] || quota.unavailable[m]; });
+      var picked = pickModels(list);
+      quota.models = picked.lite.length || picked.flash.length ? picked : null;
+      quota.modelsAt = Date.now();
+      quota.unavailable = {};
+      quota.exhausted = {};
+      cooldown = {};
+      noThinking = {};
+      saveQuota();
       status.className = "fhelp key-ok";
-      status.textContent = "Chiave valida. Puoi iniziare.";
+      status.textContent = wasOut
+        ? "Chiave valida. Oggi avevi finito le traduzioni gratuite: se hai attivato la fatturazione puoi continuare, altrimenti ripartono alle " + resetClock() + "."
+        : "Chiave valida. Puoi iniziare.";
+      clearBanner("key");
       checkKeyBanner();
+      updateUsage();
     }).catch(function (e) {
       status.className = "fhelp key-bad";
       status.textContent = e && e.code === "rate_limited"
@@ -1311,6 +2204,12 @@
     }).then(function () {
       $("key-save").disabled = false;
     });
+  });
+
+  $("forget").addEventListener("click", function () {
+    cache = {};
+    saveCache();
+    updateUsage();
   });
 
   $("clear").addEventListener("click", function () { $("clear-confirm").hidden = false; });
@@ -1329,16 +2228,20 @@
     if (e.key !== "Escape") return;
     if (!$("big").hidden) $("big").hidden = true;
     else if (!sheet.hidden) closeSheet();
+    else if (!$("phrases").hidden) closePhrases();
   });
 
   // ---------- boot ----------
   load();
+  loadExtras();
+  rollDay();
   if (!state.messages.length) state.messages = EXAMPLES.map(function (x) { return JSON.parse(JSON.stringify(x)); });
   updateTo();
   updateRecUI();
   render();
   scrollToEnd();
   checkKeyBanner();
+  if (state.settings.key && Date.now() - quota.modelsAt > 3 * 86400000) refreshModels();
   if (!window.isSecureContext) {
     showBanner("Per usare il microfono l'app va aperta da un indirizzo https://.", "error");
   }
